@@ -1134,33 +1134,13 @@ public class TimesheetService {
 
 
     public List<EmployeeMonthlyTimesheetDto> getAllEmployeesMonthlySummary(LocalDate monthStart, LocalDate monthEnd) throws Exception {
-        logger.info("Fetching monthly summaries from {} to {}", monthStart, monthEnd);
+        logger.info("Fetching timesheets from {} to {}", monthStart, monthEnd);
 
-        // Step 1: Fetch all placement user emails without date filter (all placement users)
-        List<String> placementUserEmails = candidateClient.getUserEmailsWithPlacementsForMonth(null, null); // or create a method to fetch all placements ignoring date filter
+        // Extend query period to earliest Monday before monthStart for partial weeks if desired,
+        // but here we directly query timesheets within the requested month to exclude outside data:
+        List<Timesheet> timesheets = timesheetRepository.findByWeekStartDateBetween(monthStart, monthEnd);
 
-        Map<String, String> emailToUserId = new HashMap<>();
-        for (String email : placementUserEmails) {
-            String userId = null;
-            try {
-                userId = userRegisterClient.getUserIdByEmail(email);
-            } catch (ResourceNotFoundException ex) {
-                logger.warn("User ID not found for email: {}", email);
-            }
-            if (userId != null) {
-                emailToUserId.put(email, userId);
-            }
-        }
-
-        Set<String> userIds = new HashSet<>(emailToUserId.values());
-
-        // Step 2: Fetch timesheets for the month for placement users only
-        List<Timesheet> timesheets = timesheetRepository.findByWeekStartDateBetween(monthStart, monthEnd)
-                .stream()
-                .filter(t -> userIds.contains(t.getUserId()))
-                .collect(Collectors.toList());
-
-        Map<String, List<Timesheet>> timesheetsByUser = timesheets.stream()
+        Map<String, List<Timesheet>> byUser = timesheets.stream()
                 .collect(Collectors.groupingBy(Timesheet::getUserId));
 
         List<Week> calendarWeeks = getWeeksMondayToFridayForMonth(monthStart, monthEnd);
@@ -1172,18 +1152,20 @@ public class TimesheetService {
                 "APPROVED", 4
         );
 
+        Set<String> userIds = byUser.keySet();
+
+        // Bulk fetch leave summaries for users relevant in requested month
         Map<String, EmployeeLeaveSummary> leaveSummariesMap = employeeLeaveSummaryRepository.findByUserIdIn(userIds)
                 .stream()
                 .collect(Collectors.toMap(EmployeeLeaveSummary::getUserId, ls -> ls));
 
         List<EmployeeMonthlyTimesheetDto> summaries = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : emailToUserId.entrySet()) {
-            String email = entry.getKey();
-            String userId = entry.getValue();
+        for (Map.Entry<String, List<Timesheet>> entry : byUser.entrySet()) {
+            String userId = entry.getKey();
+            List<Timesheet> empTimesheets = entry.getValue();
 
-            List<Timesheet> empTimesheets = timesheetsByUser.getOrDefault(userId, Collections.emptyList());
-
+            // Initialize arrays for weekly aggregation
             double[] weeklyWorkHours = new double[calendarWeeks.size()];
             double[] weeklyLeaveHours = new double[calendarWeeks.size()];
             String[] weeklyStatuses = new String[calendarWeeks.size()];
@@ -1191,7 +1173,11 @@ public class TimesheetService {
 
             for (Timesheet ts : empTimesheets) {
                 LocalDate tsDate = ts.getWeekStartDate();
-                if (tsDate.isBefore(monthStart) || tsDate.isAfter(monthEnd)) continue;
+
+                // Skip timesheets outside requested month still (extra safety)
+                if (tsDate.isBefore(monthStart) || tsDate.isAfter(monthEnd)) {
+                    continue;
+                }
 
                 int weekIndex = -1;
                 for (int i = 0; i < calendarWeeks.size(); i++) {
@@ -1201,6 +1187,7 @@ public class TimesheetService {
                         break;
                     }
                 }
+
                 if (weekIndex == -1) {
                     logger.warn("Timesheet weekStartDate {} not in any week", tsDate);
                     continue;
@@ -1238,13 +1225,14 @@ public class TimesheetService {
 
             List<UserInfoDto> userInfoList = userRegisterClient.getUserInfos(userId);
             String employeeName = userInfoList.isEmpty() ? "Unknown" : userInfoList.get(0).getUserName();
+            String employeeEmail = userRegisterClient.getUserEmail(userId);
 
             String employeeType = "Unknown";
             LocalDate joiningDate = null;
             String clientName = null;
             try {
-                if (email != null && !email.isBlank()) {
-                    List<PlacementDetailsDto> placements = candidateClient.getPlacementsByEmail(email);
+                if (employeeEmail != null && !employeeEmail.isBlank()) {
+                    List<PlacementDetailsDto> placements = candidateClient.getPlacementsByEmail(employeeEmail);
                     if (placements != null && !placements.isEmpty()) {
                         PlacementDetailsDto placement = placements.get(0);
                         employeeType = placement.getEmployeeType();
@@ -1253,17 +1241,18 @@ public class TimesheetService {
                     }
                 }
             } catch (ResourceNotFoundException ex) {
-                logger.warn("No placement details found for email {}: {}", email, ex.getMessage());
+                logger.warn("No placement details found for email {}: {}", employeeEmail, ex.getMessage());
             }
 
-            double totalWorkingHours = empTimesheets.isEmpty() ? 0 : Arrays.stream(weeklyWorkHours).sum();
-            double totalLeaveHours = empTimesheets.isEmpty() ? 0 : Arrays.stream(weeklyLeaveHours).sum();
+            double totalWorkingHours = Arrays.stream(weeklyWorkHours).sum();
+            double totalLeaveHours = Arrays.stream(weeklyLeaveHours).sum();
 
             EmployeeLeaveSummary leaveSummary = leaveSummariesMap.get(userId);
+
             int availableLeaves = leaveSummary != null ? leaveSummary.getAvailableLeaves() : 0;
             int takenLeaves = leaveSummary != null ? leaveSummary.getTakenLeaves() : 0;
 
-            if (availableLeaves >= 0 && "Full-time".equalsIgnoreCase(employeeType) && !empTimesheets.isEmpty()) {
+            if (availableLeaves >= 0 && "Full-time".equalsIgnoreCase(employeeType)) {
                 totalWorkingHours += totalLeaveHours;
                 for (int i = 0; i < weeklyWorkHours.length; i++) {
                     weeklyWorkHours[i] += weeklyLeaveHours[i];
@@ -1280,19 +1269,14 @@ public class TimesheetService {
             dto.setJoiningDate(joiningDate);
             dto.setStatus(aggregatedStatus);
 
-            dto.setWeek1Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 0 ? (int) Math.round(weeklyWorkHours[0]) : 0));
-            dto.setWeek2Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 1 ? (int) Math.round(weeklyWorkHours[1]) : 0));
-            dto.setWeek3Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 2 ? (int) Math.round(weeklyWorkHours[2]) : 0));
-            dto.setWeek4Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 3 ? (int) Math.round(weeklyWorkHours[3]) : 0));
-            dto.setWeek5Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 4 ? (int) Math.round(weeklyWorkHours[4]) : 0));
+            dto.setWeek1Hours(calendarWeeks.size() > 0 ? (int) Math.round(weeklyWorkHours[0]) : 0);
+            dto.setWeek2Hours(calendarWeeks.size() > 1 ? (int) Math.round(weeklyWorkHours[1]) : 0);
+            dto.setWeek3Hours(calendarWeeks.size() > 2 ? (int) Math.round(weeklyWorkHours[2]) : 0);
+            dto.setWeek4Hours(calendarWeeks.size() > 3 ? (int) Math.round(weeklyWorkHours[3]) : 0);
+            dto.setWeek5Hours(calendarWeeks.size() > 4 ? (int) Math.round(weeklyWorkHours[4]) : 0);
 
-            dto.setTotalWorkingHours(empTimesheets.isEmpty() ? 0 : (int) Math.round(totalWorkingHours));
-            if (empTimesheets.isEmpty()) {
-                dto.setTotalWorkingDays(0);
-            } else {
-                double totalWorkingDaysDouble = totalWorkingHours / 8.0;
-                dto.setTotalWorkingDays((int) Math.ceil(totalWorkingDaysDouble)); // rounds up partial days to full day
-            }
+            dto.setTotalWorkingHours((int) Math.round(totalWorkingHours));
+            dto.setTotalWorkingDays((int) Math.round(totalWorkingHours / 8.0));
 
             dto.setAvailableLeaves(availableLeaves);
             dto.setTakenLeaves(takenLeaves);
@@ -1303,7 +1287,6 @@ public class TimesheetService {
         logger.info("Completed processing monthly summaries for {} employees", summaries.size());
         return summaries;
     }
-
 
     private List<Week> getWeeksMondayToFridayForMonth(LocalDate monthStart, LocalDate monthEnd) {
         List<Week> weeks = new ArrayList<>();
