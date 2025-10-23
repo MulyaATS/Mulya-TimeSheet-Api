@@ -25,6 +25,7 @@ public class PlacementDetailsDto {
         this.candidateEmail = candidateEmail;
     }
 
+
     public String getEmployeeWorkingType() {
         return employeeWorkingType;
     }
