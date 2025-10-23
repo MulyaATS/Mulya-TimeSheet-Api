@@ -1,6 +1,5 @@
 package com.mulya.employee.timesheet.contoller;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mulya.employee.timesheet.client.UserRegisterClient;
 import com.mulya.employee.timesheet.dto.*;

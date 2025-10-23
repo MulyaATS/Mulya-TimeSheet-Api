@@ -28,11 +28,11 @@ public class LeaveService {
         if (userId == null || joiningDate == null) return null;
 
         final int finalAvailableLeaves;
-        if ("Full-time".equalsIgnoreCase(employeeType)) {
+        if ("C2C".equalsIgnoreCase(employeeType)) {
             int monthsRemaining = 12 - joiningDate.getMonthValue() + 1;
-            finalAvailableLeaves = monthsRemaining; // 1 leave per month
+            finalAvailableLeaves = monthsRemaining; // 1 leave per month for C2C
         } else {
-            finalAvailableLeaves = 0; // For other types like C2C
+            finalAvailableLeaves = 0; // For other types like Full-time
         }
 
         Optional<EmployeeLeaveSummary> optionalSummary = employeeLeaveSummaryRepository.findByUserId(userId);
@@ -53,6 +53,7 @@ public class LeaveService {
 
         return convertToDto(savedSummary);
     }
+
 
     @Transactional
     public EmployeeLeaveSummaryDto updateLeaveOnLeaveTaken(String userId, int newLeavesTaken, String updatedBy) {

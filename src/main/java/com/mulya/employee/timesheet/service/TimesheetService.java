@@ -7,13 +7,8 @@ import com.mulya.employee.timesheet.client.UserRegisterClient;
 import com.mulya.employee.timesheet.dto.*;
 import com.mulya.employee.timesheet.exception.ResourceNotFoundException;
 import com.mulya.employee.timesheet.exception.ValidationException;
-import com.mulya.employee.timesheet.model.Attachment;
-import com.mulya.employee.timesheet.model.EmployeeLeaveSummary;
-import com.mulya.employee.timesheet.model.Timesheet;
-import com.mulya.employee.timesheet.model.TimesheetType;
-import com.mulya.employee.timesheet.repository.AttachmentRepository;
-import com.mulya.employee.timesheet.repository.EmployeeLeaveSummaryRepository;
-import com.mulya.employee.timesheet.repository.TimesheetRepository;
+import com.mulya.employee.timesheet.model.*;
+import com.mulya.employee.timesheet.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
@@ -57,6 +52,12 @@ public class TimesheetService {
 
     @Autowired
     private EmployeeLeaveSummaryRepository employeeLeaveSummaryRepository;
+
+    @Autowired
+    private HolidayRepository holidayRepository;
+
+    @Autowired
+    private EmployeeLeaveTransactionRepository employeeLeaveTransactionRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(TimesheetService.class);
 
@@ -243,6 +244,26 @@ public class TimesheetService {
                     logger.info("[Leave Refund] Refunded {} leaves for userId {}", refundCount, userId);
                 }
             }
+
+            // --- Leave transaction synchronization ---
+
+            // Remove leave transactions for refunded leaves (cancelledLeaves)
+            for (TimesheetEntry cancelledLeave : cancelledLeaves) {
+                employeeLeaveTransactionRepository.deleteByUserIdAndLeaveDate(userId, cancelledLeave.getDate());
+            }
+
+            // Remove existing leave transactions for the segment
+            employeeLeaveTransactionRepository.deleteByUserIdAndLeaveDateBetween(userId, partialStart, partialEnd);
+
+            // Add leave transactions based on current non-working entries (leaves)
+            for (TimesheetEntry leaveEntry : currentNonWorkingHours) {
+                EmployeeLeaveTransaction leaveTransaction = new EmployeeLeaveTransaction();
+                leaveTransaction.setUserId(userId);
+                leaveTransaction.setLeaveDate(leaveEntry.getDate());
+                leaveTransaction.setDaysTaken((int) Math.ceil(leaveEntry.getHours() / 8.0));
+                employeeLeaveTransactionRepository.save(leaveTransaction);
+            }
+
 
             savedTimesheets.add(timesheetRepository.save(ts));
         }
@@ -1137,13 +1158,14 @@ public class TimesheetService {
         logger.info("Fetching monthly summaries from {} to {}", monthStart, monthEnd);
 
         // Step 1: Fetch all placement user emails without date filter (all placement users)
-        List<String> placementUserEmails = candidateClient.getUserEmailsWithPlacementsForMonth(null, null); // or create a method to fetch all placements ignoring date filter
+        List<String> placementUserEmails = candidateClient.getUserEmailsWithPlacementsForMonth(null, null);
 
         Map<String, String> emailToUserId = new HashMap<>();
         for (String email : placementUserEmails) {
+            if (email == null || email.isBlank()) continue;
             String userId = null;
             try {
-                userId = userRegisterClient.getUserIdByEmail(email);
+                userId = userRegisterClient.getUserIdByEmail(email.trim().toLowerCase());
             } catch (ResourceNotFoundException ex) {
                 logger.warn("User ID not found for email: {}", email);
             }
@@ -1175,6 +1197,22 @@ public class TimesheetService {
         Map<String, EmployeeLeaveSummary> leaveSummariesMap = employeeLeaveSummaryRepository.findByUserIdIn(userIds)
                 .stream()
                 .collect(Collectors.toMap(EmployeeLeaveSummary::getUserId, ls -> ls));
+
+        // Calculate total days in month including weekends and holidays
+        long totalMonthWorkingDays = ChronoUnit.DAYS.between(monthStart, monthEnd) + 1;
+
+        long weekendDaysCount = monthStart.datesUntil(monthEnd.plusDays(1))
+                .filter(d -> d.getDayOfWeek() == DayOfWeek.SATURDAY || d.getDayOfWeek() == DayOfWeek.SUNDAY)
+                .count();
+
+        List<Holiday> holidaysInMonth = holidayRepository.findByHolidayDateBetween(monthStart, monthEnd);
+        int publicHolidaysCount = holidaysInMonth.size();
+
+        // Calculate weekdays excluding weekends and public holidays
+        long totalWeekdaysExcludingHolidays = monthStart.datesUntil(monthEnd.plusDays(1))
+                .filter(d -> d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY)
+                .filter(d -> holidaysInMonth.stream().noneMatch(h -> h.getHolidayDate().isEqual(d)))
+                .count();
 
         List<EmployeeMonthlyTimesheetDto> summaries = new ArrayList<>();
 
@@ -1270,6 +1308,8 @@ public class TimesheetService {
                 }
             }
 
+            double totalWorkingDaysDouble = totalWorkingHours / 8.0;
+
             EmployeeMonthlyTimesheetDto dto = new EmployeeMonthlyTimesheetDto();
             dto.setEmployeeId(userId);
             dto.setEmployeeName(employeeName);
@@ -1287,15 +1327,16 @@ public class TimesheetService {
             dto.setWeek5Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 4 ? (int) Math.round(weeklyWorkHours[4]) : 0));
 
             dto.setTotalWorkingHours(empTimesheets.isEmpty() ? 0 : (int) Math.round(totalWorkingHours));
-            if (empTimesheets.isEmpty()) {
-                dto.setTotalWorkingDays(0);
-            } else {
-                double totalWorkingDaysDouble = totalWorkingHours / 8.0;
-                dto.setTotalWorkingDays((int) Math.ceil(totalWorkingDaysDouble)); // rounds up partial days to full day
-            }
+            dto.setTotalWorkingDays(totalWorkingDaysDouble); // fractional days
 
             dto.setAvailableLeaves(availableLeaves);
             dto.setTakenLeaves(takenLeaves);
+
+            // New fields
+            dto.setTotalMonthWorkingDays(totalMonthWorkingDays); // Calendar total days in month
+            dto.setWeekendDays((int) weekendDaysCount);
+            dto.setPublicHolidays(publicHolidaysCount);
+            dto.setLastWorkedDays(totalMonthWorkingDays - weekendDaysCount);
 
             summaries.add(dto);
         }
@@ -1303,7 +1344,6 @@ public class TimesheetService {
         logger.info("Completed processing monthly summaries for {} employees", summaries.size());
         return summaries;
     }
-
 
     private List<Week> getWeeksMondayToFridayForMonth(LocalDate monthStart, LocalDate monthEnd) {
         List<Week> weeks = new ArrayList<>();

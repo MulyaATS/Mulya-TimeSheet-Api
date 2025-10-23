@@ -19,10 +19,47 @@ public class EmployeeMonthlyTimesheetDto {
     private int week4Hours;
     private int week5Hours;
     private int totalWorkingHours;
-    private int totalWorkingDays;
+    private double totalWorkingDays;
     private int availableLeaves;
     private int takenLeaves;
     private String Status;
+    private double totalMonthWorkingDays; // all weekdays excluding holidays
+    private int weekendDays;              // total weekends in the month
+    private double lastWorkedDays;        // actual worked days from timesheets (totalWorkingDays - weekendDays)
+    private int publicHolidays;
+
+    public int getPublicHolidays() {
+        return publicHolidays;
+    }
+
+    public void setPublicHolidays(int publicHolidays) {
+        this.publicHolidays = publicHolidays;
+    }
+
+
+    public double getTotalMonthWorkingDays() {
+        return totalMonthWorkingDays;
+    }
+
+    public void setTotalMonthWorkingDays(double totalMonthWorkingDays) {
+        this.totalMonthWorkingDays = totalMonthWorkingDays;
+    }
+
+    public int getWeekendDays() {
+        return weekendDays;
+    }
+
+    public void setWeekendDays(int weekendDays) {
+        this.weekendDays = weekendDays;
+    }
+
+    public double getLastWorkedDays() {
+        return lastWorkedDays;
+    }
+
+    public void setLastWorkedDays(double lastWorkedDays) {
+        this.lastWorkedDays = lastWorkedDays;
+    }
 
     public String getStatus() {
         return Status;
@@ -125,11 +162,11 @@ public class EmployeeMonthlyTimesheetDto {
         this.totalWorkingHours = totalWorkingHours;
     }
 
-    public int getTotalWorkingDays() {
+    public double getTotalWorkingDays() {
         return totalWorkingDays;
     }
 
-    public void setTotalWorkingDays(int totalWorkingDays) {
+    public void setTotalWorkingDays(double totalWorkingDays) {
         this.totalWorkingDays = totalWorkingDays;
     }
 
