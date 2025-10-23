@@ -13,6 +13,17 @@ public class PlacementDetailsDto {
     private String employeeType;
     private String VendorName;
     private String employeeWorkingType;
+    // Add candidate email
+    @JsonProperty("candidateEmailId")
+    private String candidateEmail;
+
+    public String getCandidateEmail() {
+        return candidateEmail;
+    }
+
+    public void setCandidateEmail(String candidateEmail) {
+        this.candidateEmail = candidateEmail;
+    }
 
     public String getEmployeeWorkingType() {
         return employeeWorkingType;
