@@ -122,7 +122,7 @@ public class TimesheetService {
                 logger.warn("Could not fetch placement data for email {}: {}", employeeEmail, ex.getMessage());
             }
         }
-        isFullTime = "Full-time".equalsIgnoreCase(fullEmployeeType);
+        isFullTime = "C2C".equalsIgnoreCase(fullEmployeeType);
 
         List<Timesheet> savedTimesheets = new ArrayList<>();
 
@@ -158,7 +158,6 @@ public class TimesheetService {
                         return t;
                     });
 
-            // Deserialize existing entries
             List<TimesheetEntry> currentWorkingHours;
             List<TimesheetEntry> currentNonWorkingHours;
             try {
@@ -179,27 +178,23 @@ public class TimesheetService {
             currentWorkingHours.removeIf(entry -> segmentWorkingDates.contains(entry.getDate()));
             currentWorkingHours.addAll(segmentWorkingEntries);
 
-            // Remove replaced non-working entries for dates in segment and merge segment entries
+            // REMOVE working entries for dates present in new non-working entries (critical fix)
             Set<LocalDate> segmentNonWorkingDates = segmentNonWorkingEntries.stream()
                     .map(TimesheetEntry::getDate)
                     .collect(Collectors.toSet());
+            currentWorkingHours.removeIf(entry -> segmentNonWorkingDates.contains(entry.getDate()));  // <-- This is the fix!
             currentNonWorkingHours.removeIf(entry -> segmentNonWorkingDates.contains(entry.getDate()));
             currentNonWorkingHours.addAll(segmentNonWorkingEntries);
 
             // --- LEAVE CANCELLATION & REFUND LOGIC ---
-            // Find leaves cancelled by newly added working hours (8 hrs full days)
             Set<LocalDate> newWorkingDates = segmentWorkingEntries.stream()
                     .map(TimesheetEntry::getDate)
                     .collect(Collectors.toSet());
-
             List<TimesheetEntry> cancelledLeaves = currentNonWorkingHours.stream()
                     .filter(e -> newWorkingDates.contains(e.getDate()) && e.getHours() == 8.0)
                     .collect(Collectors.toList());
-
-            // Remove cancelled leaves from non-working entries
             currentNonWorkingHours.removeIf(entry -> newWorkingDates.contains(entry.getDate()) && entry.getHours() == 8.0);
 
-            // Serialize updated entries back
             try {
                 ts.setWorkingHours(mapper.writeValueAsString(currentWorkingHours));
                 ts.setNonWorkingHours(mapper.writeValueAsString(currentNonWorkingHours));
@@ -366,7 +361,7 @@ public class TimesheetService {
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("No ADMIN manager"));
 
-        UserInfoDto managerInfo = userRegisterClient.getUserInfos(managerDto.getUserId()).get(0);
+        UserInfoDto managerInfo = userRegisterClient.getUserRoleAndUsername("ADRTIN189");
         UserInfoDto empInfo = userRegisterClient.getUserInfos(ts.getUserId()).get(0);
 
         emailService.sendManagerApprovalRequestEmail(
@@ -531,6 +526,7 @@ public class TimesheetService {
             ts.setStatus("REJECTED");
             ts.setApprovedAt(LocalDateTime.now());
             ts.setApprovedBy(managerInfo.getUserName());
+            ts.setRejectReason(reason);
         }
 
         timesheetRepository.saveAll(timesheets);
@@ -663,65 +659,6 @@ public class TimesheetService {
                 .collect(Collectors.toList());
     }
 
-    public double calculateProportionalTargetForMonth(
-            Timesheet ts,
-            LocalDate monthStart,
-            LocalDate monthEnd,
-            boolean isFullTime) {
-
-        LocalDate weekStart = ts.getWeekStartDate();
-        LocalDate weekEnd = ts.getWeekEndDate();
-
-        // Calculate overlap between timesheet week and requested month
-        LocalDate overlapStart = weekStart.isBefore(monthStart) ? monthStart : weekStart;
-        LocalDate overlapEnd = weekEnd.isAfter(monthEnd) ? monthEnd : weekEnd;
-
-        if (overlapEnd.isBefore(overlapStart)) {
-            return 0.0;
-        }
-
-        // Count workdays (Mon-Fri) in overlap
-        int workdays = 0;
-        for (LocalDate d = overlapStart; !d.isAfter(overlapEnd); d = d.plusDays(1)) {
-            DayOfWeek dow = d.getDayOfWeek();
-            if (dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY) {
-                workdays++;
-            }
-        }
-
-        double targetHours = workdays * 8.0;
-
-        List<TimesheetEntry> workingEntries;
-        List<TimesheetEntry> nonWorkingEntries;
-        try {
-            workingEntries = mapper.readValue(ts.getWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
-            nonWorkingEntries = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
-        } catch (Exception e) {
-            e.printStackTrace();
-            return 0.0;
-        }
-
-        // Filter entries in the overlap period
-        List<TimesheetEntry> filteredWorking = workingEntries.stream()
-                .filter(e -> !e.getDate().isBefore(overlapStart) && !e.getDate().isAfter(overlapEnd))
-                .collect(Collectors.toList());
-
-        List<TimesheetEntry> filteredNonWorking = nonWorkingEntries.stream()
-                .filter(e -> !e.getDate().isBefore(overlapStart) && !e.getDate().isAfter(overlapEnd))
-                .collect(Collectors.toList());
-
-        double totalWorkingHours = filteredWorking.stream().mapToDouble(TimesheetEntry::getHours).sum();
-        double totalLeaveHours = filteredNonWorking.stream().mapToDouble(TimesheetEntry::getHours).sum();
-
-        double effectiveHours = totalWorkingHours + (isFullTime ? totalLeaveHours : 0);
-
-        if (targetHours == 0) return 0.0;
-
-        return (effectiveHours / targetHours) * 100.0;
-    }
-
-
-
 
     public List<TimesheetResponse> getAllTimesheets() {
         return timesheetRepository.findAll()
@@ -837,6 +774,7 @@ public class TimesheetService {
         resp.setUserId(ts.getUserId());
         resp.setEmployeeName(employeeName);
         resp.setEmployeeType(ts.getEmployeeType());
+        resp.setRejectReason(ts.getRejectReason());
 
         boolean isFullTime = false;
         // Fetch timesheetType dynamically from placements and determine isFullTime
@@ -853,7 +791,7 @@ public class TimesheetService {
                     resp.setEmployeeRoleType(placement.getEmployeeType());
                     System.out.println("Timesheet employeeType (from entity): " + placement.getEmployeeType());
 
-                    isFullTime = "Full-time".equalsIgnoreCase(placement.getEmployeeType());
+                    isFullTime = "C2C".equalsIgnoreCase(placement.getEmployeeType());
                 } else {
                     resp.setTimesheetType(TimesheetType.WEEKLY); // fallback default
                 }
@@ -1301,7 +1239,7 @@ public class TimesheetService {
             int availableLeaves = leaveSummary != null ? leaveSummary.getAvailableLeaves() : 0;
             int takenLeaves = leaveSummary != null ? leaveSummary.getTakenLeaves() : 0;
 
-            if (availableLeaves >= 0 && "Full-time".equalsIgnoreCase(employeeType) && !empTimesheets.isEmpty()) {
+            if (availableLeaves >= 0 && "C2C".equalsIgnoreCase(employeeType) && !empTimesheets.isEmpty()) {
                 totalWorkingHours += totalLeaveHours;
                 for (int i = 0; i < weeklyWorkHours.length; i++) {
                     weeklyWorkHours[i] += weeklyLeaveHours[i];

@@ -35,6 +35,11 @@ public class TimesheetResponse {
     }
     private LocalDate startDate;
     private String clientName;
+    private String rejectReason;
+
+    public String getRejectReason() { return rejectReason; }
+    public void setRejectReason(String rejectReason) { this.rejectReason = rejectReason; }
+
 
     public LocalDate getStartDate() {
         return startDate;
