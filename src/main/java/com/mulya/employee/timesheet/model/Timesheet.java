@@ -79,6 +79,12 @@ public class Timesheet {
     @OneToMany(mappedBy = "timesheet", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Attachment> attachments;
 
+    @Column(name = "reject_reason", length = 500)
+    private String rejectReason;
+
+    public String getRejectReason() { return rejectReason; }
+    public void setRejectReason(String rejectReason) { this.rejectReason = rejectReason; }
+
     public String getTimesheetId() { return timesheetId; }
     public void setTimesheetId(String timesheetId) { this.timesheetId = timesheetId; }
 

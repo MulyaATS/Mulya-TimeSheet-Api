@@ -1,43 +1,56 @@
 package com.mulya.employee.timesheet.contoller;
 
-import com.mulya.employee.timesheet.repository.EmployeeLeaveTransactionRepository;
+import com.mulya.employee.timesheet.dto.ApiResponse;
+import com.mulya.employee.timesheet.dto.UpdateLeaveTransactionRequest;
+import com.mulya.employee.timesheet.model.EmployeeLeaveTransaction;
+import com.mulya.employee.timesheet.service.LeaveService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 @RestController
-@RequestMapping("/timesheet/Leaves")
+@RequestMapping("/timesheet/leaves")
 public class LeaveController {
-    
+
     @Autowired
-    private EmployeeLeaveTransactionRepository leaveTransactionRepository;
+    private LeaveService leaveService;
 
-    @GetMapping("/taken/{userId}")
-    public ResponseEntity<?> getLeavesTakenForUserByMonth(
-            @PathVariable String userId,
-            @RequestParam String monthStart,  // Format "yyyy-MM-dd"
-            @RequestParam String monthEnd) {
+    // GET leave transactions by userId and optional month range
+    @GetMapping("/leave-transactions")
+    public ResponseEntity<ApiResponse<List<EmployeeLeaveTransaction>>> getLeaveTransactions(
+            @RequestParam String userId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthEnd) {
         try {
-            LocalDate start = LocalDate.parse(monthStart);
-            LocalDate end = LocalDate.parse(monthEnd);
-
-            Integer leavesTaken = leaveTransactionRepository.sumLeavesTakenByUserIdBetweenDates(userId, start, end);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("userId", userId);
-            response.put("monthStart", start);
-            response.put("monthEnd", end);
-            response.put("leavesTaken", leavesTaken);
-
-            return ResponseEntity.ok(response);
+            List<EmployeeLeaveTransaction> transactions = leaveService.getLeaveTransactionsMonthly(userId, monthStart, monthEnd);
+            return ResponseEntity.ok(ApiResponse.success("Leave transactions fetched", transactions));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "Invalid request or internal error: " + e.getMessage()));
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Failed to fetch leave transactions", "500", e.getMessage()));
+        }
+    }
+
+    // PUT update leave transaction with transactional sync
+    @PutMapping("/update-leave-transactions/{transactionId}")
+    public ResponseEntity<ApiResponse<EmployeeLeaveTransaction>> updateLeaveTransaction(
+            @PathVariable Long transactionId,
+            @RequestBody UpdateLeaveTransactionRequest updateRequest) {
+
+        try {
+            EmployeeLeaveTransaction updated = leaveService.updateLeaveTransaction(
+                    transactionId,
+                    updateRequest.getLeaveDate(),
+                    updateRequest.getDaysTaken(),
+                    updateRequest.getUpdatedBy()
+            );
+            return ResponseEntity.ok(ApiResponse.success("Leave transaction updated successfully", updated));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Error updating leave transaction", "500", e.getMessage()));
         }
     }
 }

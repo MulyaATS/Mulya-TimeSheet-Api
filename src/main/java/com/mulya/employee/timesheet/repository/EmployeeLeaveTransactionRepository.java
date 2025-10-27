@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public interface EmployeeLeaveTransactionRepository extends JpaRepository<EmployeeLeaveTransaction, Long> {
 
@@ -19,5 +20,9 @@ public interface EmployeeLeaveTransactionRepository extends JpaRepository<Employ
     void deleteByUserIdAndLeaveDate(String userId, LocalDate leaveDate);
 
     void deleteByUserIdAndLeaveDateBetween(String userId, LocalDate startDate, LocalDate endDate);
+
+    List<EmployeeLeaveTransaction> findByUserId(String userId);
+
+    List<EmployeeLeaveTransaction> findByUserIdAndLeaveDateBetween(String userId, LocalDate startDate, LocalDate endDate);
 
 }
