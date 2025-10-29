@@ -3,6 +3,7 @@ package com.mulya.employee.timesheet.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mulya.employee.timesheet.client.CandidateClient;
+import com.mulya.employee.timesheet.client.ClientServiceClient;
 import com.mulya.employee.timesheet.client.UserRegisterClient;
 import com.mulya.employee.timesheet.dto.*;
 import com.mulya.employee.timesheet.exception.ResourceNotFoundException;
@@ -37,6 +38,9 @@ public class TimesheetService {
 
     @Autowired
     private CandidateClient candidateClient;
+
+    @Autowired
+    private ClientServiceClient clientServiceClient;
 
     @Autowired
     private EmailService emailService;
@@ -1136,20 +1140,14 @@ public class TimesheetService {
                 .stream()
                 .collect(Collectors.toMap(EmployeeLeaveSummary::getUserId, ls -> ls));
 
-        // Calculate total days in month including weekends and holidays
+        // Fetch all clients once (consider caching for performance)
+        List<ClientSimpleDto> allClients = clientServiceClient.getAllClients();
+
+        // Calculate total days in month including weekends
         long totalMonthWorkingDays = ChronoUnit.DAYS.between(monthStart, monthEnd) + 1;
 
         long weekendDaysCount = monthStart.datesUntil(monthEnd.plusDays(1))
                 .filter(d -> d.getDayOfWeek() == DayOfWeek.SATURDAY || d.getDayOfWeek() == DayOfWeek.SUNDAY)
-                .count();
-
-        List<Holiday> holidaysInMonth = holidayRepository.findByHolidayDateBetween(monthStart, monthEnd);
-        int publicHolidaysCount = holidaysInMonth.size();
-
-        // Calculate weekdays excluding weekends and public holidays
-        long totalWeekdaysExcludingHolidays = monthStart.datesUntil(monthEnd.plusDays(1))
-                .filter(d -> d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY)
-                .filter(d -> holidaysInMonth.stream().noneMatch(h -> h.getHolidayDate().isEqual(d)))
                 .count();
 
         List<EmployeeMonthlyTimesheetDto> summaries = new ArrayList<>();
@@ -1159,6 +1157,45 @@ public class TimesheetService {
             String userId = entry.getValue();
 
             List<Timesheet> empTimesheets = timesheetsByUser.getOrDefault(userId, Collections.emptyList());
+
+            // Get placement info for employee
+            String employeeType = "Unknown";
+            LocalDate joiningDate = null;
+            String clientName = null;
+            String clientId = null;
+            try {
+                if (email != null && !email.isBlank()) {
+                    List<PlacementDetailsDto> placements = candidateClient.getPlacementsByEmail(email);
+                    if (placements != null && !placements.isEmpty()) {
+                        PlacementDetailsDto placement = placements.get(0);
+                        employeeType = placement.getEmployeeType();
+                        joiningDate = placement.getStartDate();
+                        clientName = placement.getClientName();
+                        final String finalClientName = clientName;
+                        // Lookup client ID from fetched client list by client name
+                        Optional<ClientSimpleDto> clientOpt = allClients.stream()
+                                .filter(c -> c.getClientName() != null && c.getClientName().equalsIgnoreCase(finalClientName))
+                                .findFirst();
+                        if (clientOpt.isPresent()) {
+                            clientId = clientOpt.get().getClientId();
+                        }
+                    }
+                }
+            } catch (ResourceNotFoundException ex) {
+                logger.warn("No placement details found for email {}: {}", email, ex.getMessage());
+            }
+
+            // Fetch holidays filtered by client ID and date range
+            List<Holiday> holidaysInMonth = clientId != null
+                    ? holidayRepository.findByClientIdAndHolidayDateBetween(clientId, monthStart, monthEnd)
+                    : Collections.emptyList();
+            int publicHolidaysCount = holidaysInMonth.size();
+
+            // Calculate weekdays excluding weekends and public holidays
+            long totalWeekdaysExcludingHolidays = monthStart.datesUntil(monthEnd.plusDays(1))
+                    .filter(d -> d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY)
+                    .filter(d -> holidaysInMonth.stream().noneMatch(h -> h.getHolidayDate().isEqual(d)))
+                    .count();
 
             double[] weeklyWorkHours = new double[calendarWeeks.size()];
             double[] weeklyLeaveHours = new double[calendarWeeks.size()];
@@ -1214,23 +1251,6 @@ public class TimesheetService {
 
             List<UserInfoDto> userInfoList = userRegisterClient.getUserInfos(userId);
             String employeeName = userInfoList.isEmpty() ? "Unknown" : userInfoList.get(0).getUserName();
-
-            String employeeType = "Unknown";
-            LocalDate joiningDate = null;
-            String clientName = null;
-            try {
-                if (email != null && !email.isBlank()) {
-                    List<PlacementDetailsDto> placements = candidateClient.getPlacementsByEmail(email);
-                    if (placements != null && !placements.isEmpty()) {
-                        PlacementDetailsDto placement = placements.get(0);
-                        employeeType = placement.getEmployeeType();
-                        joiningDate = placement.getStartDate();
-                        clientName = placement.getClientName();
-                    }
-                }
-            } catch (ResourceNotFoundException ex) {
-                logger.warn("No placement details found for email {}: {}", email, ex.getMessage());
-            }
 
             double totalWorkingHours = empTimesheets.isEmpty() ? 0 : Arrays.stream(weeklyWorkHours).sum();
             double totalLeaveHours = empTimesheets.isEmpty() ? 0 : Arrays.stream(weeklyLeaveHours).sum();
@@ -1314,6 +1334,106 @@ public class TimesheetService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void updateAllLeaveSummaries(LocalDate summaryTillDate) {
+        List<String> employeeEmails = candidateClient.getUserEmailsWithPlacementsForMonth(null, null);
+
+        for (String email : employeeEmails) {
+            try {
+                String normalizedEmail = email.trim().toLowerCase();
+
+                List<PlacementDetailsDto> placements = candidateClient.getPlacementsByEmail(normalizedEmail);
+                if (placements == null || placements.isEmpty()) {
+                    updateSummaryForUserWithoutPlacement(normalizedEmail, summaryTillDate);
+                    continue;
+                }
+
+                PlacementDetailsDto placement = placements.get(0);
+                String employeeEmail = placement.getCandidateEmail();
+                if (employeeEmail == null) continue;
+
+                String userId;
+                try {
+                    userId = userRegisterClient.getUserIdByEmail(employeeEmail.trim().toLowerCase());
+                } catch (ResourceNotFoundException e) {
+                    logger.warn("User ID not found for placement email: {}", employeeEmail);
+                    continue;
+                }
+
+                LocalDate joinDate = placement.getStartDate();
+                String employeeType = placement.getEmployeeType();
+
+                int leavesTaken = 0;
+                List<EmployeeLeaveTransaction> transactions = employeeLeaveTransactionRepository.findByUserId(userId);
+                if (transactions != null && !transactions.isEmpty()) {
+                    leavesTaken = transactions.stream().mapToInt(EmployeeLeaveTransaction::getDaysTaken).sum();
+                }
+
+                int availableLeaves = 0;
+
+                if ("C2C".equalsIgnoreCase(employeeType) && joinDate != null) {
+                    int months = Math.max(
+                            0,
+                            (int) ChronoUnit.MONTHS.between(YearMonth.from(joinDate), YearMonth.from(summaryTillDate)) + 1
+                    );
+                    availableLeaves = Math.max(0, months - leavesTaken);
+                } else {
+                    // For non-C2C, explicitly set available leaves to 0
+                    availableLeaves = 0;
+                }
+
+                // Update or create the summary record
+                EmployeeLeaveSummary summary = employeeLeaveSummaryRepository.findByUserId(userId)
+                        .orElse(new EmployeeLeaveSummary());
+                String userName = userRegisterClient.getUserInfos(userId).stream()
+                        .findFirst()
+                        .map(UserInfoDto::getUserName)
+                        .orElse("Unknown");
+
+                summary.setUserId(userId);
+                summary.setEmployeeName(userName);
+                summary.setAvailableLeaves(availableLeaves);
+                summary.setTakenLeaves(leavesTaken);
+                summary.setUpdatedAt(LocalDateTime.now());
+
+                employeeLeaveSummaryRepository.save(summary);
+                employeeLeaveSummaryRepository.flush();
+
+                logger.info("Updated leave summary for userId={} availableLeaves={} takenLeaves={}", userId, availableLeaves, leavesTaken);
+            } catch (Exception ex) {
+                logger.error("Failed processing email {}: {}", email, ex.getMessage());
+            }
+        }
+    }
+
+    private void updateSummaryForUserWithoutPlacement(String normalizedEmail, LocalDate summaryTillDate) {
+        // Handle users without placements, e.g. set availableLeaves=0 and proper leavesTaken
+        String userId;
+        try {
+            userId = userRegisterClient.getUserIdByEmail(normalizedEmail);
+        } catch (ResourceNotFoundException e) {
+            logger.warn("User ID not found for email: {}", normalizedEmail);
+            return;
+        }
+        List<EmployeeLeaveTransaction> transactions = employeeLeaveTransactionRepository.findByUserId(userId);
+        int leavesTaken = transactions.stream().mapToInt(EmployeeLeaveTransaction::getDaysTaken).sum();
+
+        EmployeeLeaveSummary summary = employeeLeaveSummaryRepository.findByUserId(userId)
+                .orElse(new EmployeeLeaveSummary());
+        summary.setUserId(userId);
+
+        String userName = userRegisterClient.getUserInfos(userId).stream()
+                .findFirst()
+                .map(UserInfoDto::getUserName)
+                .orElse("Unknown");
+        summary.setEmployeeName(userName);
+
+        summary.setAvailableLeaves(0);
+        summary.setTakenLeaves(leavesTaken);
+        summary.setUpdatedAt(LocalDateTime.now());
+        employeeLeaveSummaryRepository.save(summary);
     }
 
 }
