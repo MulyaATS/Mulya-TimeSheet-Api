@@ -378,4 +378,16 @@ public class TimesheetController {
                     .body(ApiResponse.error("Failed to fetch vendor names", String.valueOf(HttpStatus.INTERNAL_SERVER_ERROR.value()), e.getMessage()));
         }
     }
+
+    @PostMapping("/recalculate")
+    public ResponseEntity<ApiResponse<String>> recalculateAllSummaries() {
+        try {
+            timesheetService.updateAllLeaveSummaries(LocalDate.now());
+            return ResponseEntity.ok(ApiResponse.success("Leave summaries recalculated successfully", "OK"));
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Failed to recalculate leave summaries", "500", e.getMessage()));
+        }
+    }
 }

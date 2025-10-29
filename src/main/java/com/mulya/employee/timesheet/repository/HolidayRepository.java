@@ -20,4 +20,7 @@ public interface HolidayRepository extends JpaRepository<Holiday, Long> {
     List<Holiday> findByClientId(String clientId);
 
     List<Holiday> findByHolidayDateBetween(LocalDate startDate, LocalDate endDate);
+
+    List<Holiday> findByClientIdAndHolidayDateBetween(String clientId, LocalDate startDate, LocalDate endDate);
+
 }
