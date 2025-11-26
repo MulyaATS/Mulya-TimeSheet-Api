@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - develop
+      
 
 jobs:
   build-and-push:
