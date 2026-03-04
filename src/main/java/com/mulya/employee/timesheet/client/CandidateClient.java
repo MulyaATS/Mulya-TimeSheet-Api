@@ -116,61 +116,7 @@ public class CandidateClient {
         }
     }
 
-    public List<String> getUserEmailsWithPlacementsForMonthV1(LocalDate monthStart, LocalDate monthEnd) {
 
-        UriComponentsBuilder uriBuilder =
-                UriComponentsBuilder.fromHttpUrl(candidateServiceBaseUrl + "/placement/placements-list");
-
-        if (monthStart != null && monthEnd != null) {
-            uriBuilder.queryParam("startDate", monthStart.toString())
-                    .queryParam("endDate", monthEnd.toString());
-        } else {
-            System.out.println("Fetching placements without date filtering");
-        }
-
-        String url = uriBuilder.toUriString();
-        System.out.println("Fetching placement emails from URL: " + url);
-
-        try {
-            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    null,
-                    new ParameterizedTypeReference<Map<String, Object>>() {}
-            );
-
-            Map<String, Object> body = response.getBody();
-
-            List<Map<String, Object>> activePlacements = null;
-
-            if (body != null && body.containsKey("data")) {
-
-                Object data = body.get("data");
-
-                List<Map<String, Object>> placements =
-                        mapper.convertValue(data, new TypeReference<List<Map<String, Object>>>() {});
-
-                activePlacements = placements.stream()
-                        .filter(p -> "Active".equalsIgnoreCase((String) p.get("status")))
-                        .toList();
-            }
-
-            if (activePlacements == null || activePlacements.isEmpty()) {
-                System.out.println("No active placements found");
-                return List.of();
-            }
-
-            return activePlacements.stream()
-                    .map(p -> (String) p.get("candidateEmail"))
-                    .filter(email -> email != null && !email.isBlank())
-                    .distinct()
-                    .toList();
-
-        } catch (Exception e) {
-            System.err.println("Error fetching placements: " + e.getMessage());
-            return List.of();
-        }
-    }
 
     private String extractErrorMessageFromJson(String json) {
         try {

@@ -1100,7 +1100,7 @@ public class TimesheetService {
         logger.info("Fetching monthly summaries from {} to {}", monthStart, monthEnd);
 
         // Step 1: Fetch all placement user emails without date filter (all placement users)
-        List<String> placementUserEmails = candidateClient.getUserEmailsWithPlacementsForMonthV1(null, null);
+        List<String> placementUserEmails = candidateClient.getUserEmailsWithPlacementsForMonth(null, null);
 
         Map<String, String> emailToUserId = new HashMap<>();
         for (String email : placementUserEmails) {
