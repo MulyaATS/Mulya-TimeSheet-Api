@@ -27,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -329,19 +330,27 @@ public class TimesheetController {
     }
 
     @GetMapping("/monthly-timesheets")
-    public ResponseEntity<ApiResponse<List<EmployeeMonthlyTimesheetDto>>> getAllEmployeeMonthlySummary(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAllEmployeeMonthlySummary(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthEnd
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthEnd,
+            @RequestParam(defaultValue = "") String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) throws Exception {
 
         LocalDate normalizedStart = monthStart.withDayOfMonth(1);
-        LocalDate normalizedEnd = (monthEnd == null) ? normalizedStart.withDayOfMonth(normalizedStart.lengthOfMonth())
+        LocalDate normalizedEnd = (monthEnd == null)
+                ? normalizedStart.withDayOfMonth(normalizedStart.lengthOfMonth())
                 : monthEnd.withDayOfMonth(monthEnd.lengthOfMonth());
 
-        List<EmployeeMonthlyTimesheetDto> summaries = timesheetService.getAllEmployeesMonthlySummary(normalizedStart, normalizedEnd);
+        Pageable pageable = PageRequest.of(page, size);
 
-        return ResponseEntity.ok(ApiResponse.success("Monthly timesheet summaries fetched", summaries));
+        Map<String, Object> response =
+                timesheetService.getAllEmployeesMonthlySummary(normalizedStart, normalizedEnd, search, pageable);
+
+        return ResponseEntity.ok(ApiResponse.success("Monthly timesheet summaries fetched", response));
     }
+
 
     @PostMapping("/leave-initialization")
     public ResponseEntity<ApiResponse<EmployeeLeaveSummaryDto>> initializeLeave(@RequestBody EmployeeLeaveSummaryDto dto) {

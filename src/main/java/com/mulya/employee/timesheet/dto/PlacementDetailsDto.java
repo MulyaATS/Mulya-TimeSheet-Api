@@ -9,6 +9,7 @@ import java.time.LocalDate;
 public class PlacementDetailsDto {
     private LocalDate startDate;
     private String clientName;
+    private String ClientId;
     @JsonProperty("employmentType")
     private String employeeType;
     private String VendorName;
@@ -60,4 +61,10 @@ public class PlacementDetailsDto {
     }
     public void setVendorName(String vendorName) {
         VendorName = vendorName;}
+
+    public String getClientId() { return ClientId; }
+
+    public void setClientId(String clientId) {
+        ClientId = clientId;
+    }
 }

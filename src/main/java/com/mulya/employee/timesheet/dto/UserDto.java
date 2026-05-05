@@ -8,7 +8,8 @@ public class UserDto {
     private String userName;
     private String email;
     private String employeeType;
-    private String role; // single enum role value
+    private String role;
+    private String status;// single enum role value
 
     public String getRole() {
         return role;
@@ -49,4 +50,8 @@ public class UserDto {
     public void setEmployeeType(String employeeType) {
         this.employeeType = employeeType;
     }
+
+    public String getStatus() { return status; }
+
+    public void setStatus(String status) { this.status = status; }
 }

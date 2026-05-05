@@ -5,6 +5,8 @@ public class UserInfoDto {
     private String userName;
     private String managerName;
     private String email;
+    private String employeeType;
+    private String clientName;
 
     public String getUserId() {
         return userId;
@@ -12,6 +14,14 @@ public class UserInfoDto {
 
     public void setUserId(String userId) {
         this.userId = userId;
+    }
+
+    public String getEmployeeType() {
+        return employeeType;
+    }
+
+    public void setEmployeeType(String employeeType) {
+        this.employeeType = employeeType;
     }
 
     public String getUserName() {
@@ -36,5 +46,13 @@ public class UserInfoDto {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getClientName() {
+        return clientName;
+    }
+
+    public void setClientName(String clientName) {
+        this.clientName = clientName;
     }
 }
