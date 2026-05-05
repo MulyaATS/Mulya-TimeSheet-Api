@@ -37,16 +37,26 @@ public class UserRegisterClient {
                 .queryParam("userId", userId)
                 .toUriString();
 
-        ResponseEntity<List<UserDto>> response = restTemplate.exchange(
-                url, HttpMethod.GET, null,
-                new ParameterizedTypeReference<List<UserDto>>() {});
+        try {
+            ResponseEntity<List<UserDto>> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<UserDto>>() {}
+            );
 
-        List<UserDto> users = response.getBody();
-        if (users == null || users.isEmpty()) {
-            throw new ResourceNotFoundException("User not found with ID: " + userId, ResourceNotFoundException.ResourceType.USER);
+            List<UserDto> users = response.getBody();
+            if (users != null && !users.isEmpty()) {
+                UserDto user = users.get(0);
+                setEmployeeTypeFromRole(user);
+                return user;
+            }
+
+            return null;
+
+        } catch (Exception e) {
+            return null;
         }
-        setEmployeeTypeFromRole(users.get(0));
-        return users.get(0);
     }
 
     /**
