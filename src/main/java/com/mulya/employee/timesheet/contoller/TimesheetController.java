@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -27,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -329,16 +331,20 @@ public class TimesheetController {
     }
 
     @GetMapping("/monthly-timesheets")
-    public ResponseEntity<ApiResponse<List<EmployeeMonthlyTimesheetDto>>> getAllEmployeeMonthlySummary(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAllEmployeeMonthlySummary(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthEnd
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthEnd,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search
     ) throws Exception {
 
         LocalDate normalizedStart = monthStart.withDayOfMonth(1);
         LocalDate normalizedEnd = (monthEnd == null) ? normalizedStart.withDayOfMonth(normalizedStart.lengthOfMonth())
                 : monthEnd.withDayOfMonth(monthEnd.lengthOfMonth());
 
-        List<EmployeeMonthlyTimesheetDto> summaries = timesheetService.getAllEmployeesMonthlySummary(normalizedStart, normalizedEnd);
+        Pageable pageable = PageRequest.of(page, size);
+        Map<String, Object> summaries = timesheetService.getAllEmployeesMonthlySummary(normalizedStart, normalizedEnd, pageable, search);
 
         return ResponseEntity.ok(ApiResponse.success("Monthly timesheet summaries fetched", summaries));
     }

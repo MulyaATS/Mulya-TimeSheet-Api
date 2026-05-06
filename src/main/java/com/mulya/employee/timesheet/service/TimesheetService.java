@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -1096,10 +1097,15 @@ public class TimesheetService {
     }
 
 
-    public List<EmployeeMonthlyTimesheetDto> getAllEmployeesMonthlySummary(LocalDate monthStart, LocalDate monthEnd) throws Exception {
+    public Map<String, Object> getAllEmployeesMonthlySummary(
+            LocalDate monthStart,
+            LocalDate monthEnd,
+            Pageable pageable,
+            String search
+    ) throws Exception{
+
         logger.info("Fetching monthly summaries from {} to {}", monthStart, monthEnd);
 
-        // Step 1: Fetch all placement user emails without date filter (all placement users)
         List<String> placementUserEmails = candidateClient.getUserEmailsWithPlacementsForMonth(null, null);
 
         Map<String, String> emailToUserId = new HashMap<>();
@@ -1118,7 +1124,6 @@ public class TimesheetService {
 
         Set<String> userIds = new HashSet<>(emailToUserId.values());
 
-        // Step 2: Fetch timesheets for the month for placement users only
         List<Timesheet> timesheets = timesheetRepository.findByWeekStartDateBetween(monthStart, monthEnd)
                 .stream()
                 .filter(t -> userIds.contains(t.getUserId()))
@@ -1140,10 +1145,8 @@ public class TimesheetService {
                 .stream()
                 .collect(Collectors.toMap(EmployeeLeaveSummary::getUserId, ls -> ls));
 
-        // Fetch all clients once (consider caching for performance)
         List<ClientSimpleDto> allClients = clientServiceClient.getAllClients();
 
-        // Calculate total days in month including weekends
         long totalMonthWorkingDays = ChronoUnit.DAYS.between(monthStart, monthEnd) + 1;
 
         long weekendDaysCount = monthStart.datesUntil(monthEnd.plusDays(1))
@@ -1157,8 +1160,6 @@ public class TimesheetService {
             String userId = entry.getValue();
 
             List<Timesheet> empTimesheets = timesheetsByUser.getOrDefault(userId, Collections.emptyList());
-
-            // Get placement info for employee
             String employeeType = "Unknown";
             LocalDate joiningDate = null;
             String clientName = null;
@@ -1172,7 +1173,6 @@ public class TimesheetService {
                         joiningDate = placement.getStartDate();
                         clientName = placement.getClientName();
                         final String finalClientName = clientName;
-                        // Lookup client ID from fetched client list by client name
                         Optional<ClientSimpleDto> clientOpt = allClients.stream()
                                 .filter(c -> c.getClientName() != null && c.getClientName().equalsIgnoreCase(finalClientName))
                                 .findFirst();
@@ -1185,13 +1185,11 @@ public class TimesheetService {
                 logger.warn("No placement details found for email {}: {}", email, ex.getMessage());
             }
 
-            // Fetch holidays filtered by client ID and date range
             List<Holiday> holidaysInMonth = clientId != null
                     ? holidayRepository.findByClientIdAndHolidayDateBetween(clientId, monthStart, monthEnd)
                     : Collections.emptyList();
             int publicHolidaysCount = holidaysInMonth.size();
 
-            // Calculate weekdays excluding weekends and public holidays
             long totalWeekdaysExcludingHolidays = monthStart.datesUntil(monthEnd.plusDays(1))
                     .filter(d -> d.getDayOfWeek() != DayOfWeek.SATURDAY && d.getDayOfWeek() != DayOfWeek.SUNDAY)
                     .filter(d -> holidaysInMonth.stream().noneMatch(h -> h.getHolidayDate().isEqual(d)))
@@ -1214,10 +1212,7 @@ public class TimesheetService {
                         break;
                     }
                 }
-                if (weekIndex == -1) {
-                    logger.warn("Timesheet weekStartDate {} not in any week", tsDate);
-                    continue;
-                }
+                if (weekIndex == -1) continue;
 
                 Week currentWeek = calendarWeeks.get(weekIndex);
 
@@ -1238,8 +1233,7 @@ public class TimesheetService {
                 weeklyLeaveHours[weekIndex] += leaveHours;
 
                 String tsStatus = ts.getStatus() != null ? ts.getStatus() : "NO_TIMESHEET";
-                if (weeklyStatuses[weekIndex].equals("NO_TIMESHEET") ||
-                        statusPriority.getOrDefault(tsStatus, Integer.MAX_VALUE) < statusPriority.getOrDefault(weeklyStatuses[weekIndex], Integer.MAX_VALUE)) {
+                if (weeklyStatuses[weekIndex].equals("NO_TIMESHEET") || statusPriority.getOrDefault(tsStatus, Integer.MAX_VALUE) < statusPriority.getOrDefault(weeklyStatuses[weekIndex], Integer.MAX_VALUE)) {
                     weeklyStatuses[weekIndex] = tsStatus;
                 }
             }
@@ -1278,20 +1272,17 @@ public class TimesheetService {
             dto.setJoiningDate(joiningDate);
             dto.setStatus(aggregatedStatus);
 
-            dto.setWeek1Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 0 ? (int) Math.round(weeklyWorkHours[0]) : 0));
-            dto.setWeek2Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 1 ? (int) Math.round(weeklyWorkHours[1]) : 0));
-            dto.setWeek3Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 2 ? (int) Math.round(weeklyWorkHours[2]) : 0));
-            dto.setWeek4Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 3 ? (int) Math.round(weeklyWorkHours[3]) : 0));
-            dto.setWeek5Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 4 ? (int) Math.round(weeklyWorkHours[4]) : 0));
+            dto.setWeek1Hours(calendarWeeks.size() > 0 ? (int) Math.round(weeklyWorkHours[0]) : 0);
+            dto.setWeek2Hours(calendarWeeks.size() > 1 ? (int) Math.round(weeklyWorkHours[1]) : 0);
+            dto.setWeek3Hours(calendarWeeks.size() > 2 ? (int) Math.round(weeklyWorkHours[2]) : 0);
+            dto.setWeek4Hours(calendarWeeks.size() > 3 ? (int) Math.round(weeklyWorkHours[3]) : 0);
+            dto.setWeek5Hours(calendarWeeks.size() > 4 ? (int) Math.round(weeklyWorkHours[4]) : 0);
 
-            dto.setTotalWorkingHours(empTimesheets.isEmpty() ? 0 : (int) Math.round(totalWorkingHours));
-            dto.setTotalWorkingDays(totalWorkingDaysDouble); // fractional days
-
+            dto.setTotalWorkingHours((int) Math.round(totalWorkingHours));
+            dto.setTotalWorkingDays(totalWorkingDaysDouble);
             dto.setAvailableLeaves(availableLeaves);
             dto.setTakenLeaves(takenLeaves);
-
-            // New fields
-            dto.setTotalMonthWorkingDays(totalMonthWorkingDays); // Calendar total days in month
+            dto.setTotalMonthWorkingDays(totalMonthWorkingDays);
             dto.setWeekendDays((int) weekendDaysCount);
             dto.setPublicHolidays(publicHolidaysCount);
             dto.setLastWorkedDays(totalMonthWorkingDays - weekendDaysCount);
@@ -1300,7 +1291,37 @@ public class TimesheetService {
         }
 
         logger.info("Completed processing monthly summaries for {} employees", summaries.size());
-        return summaries;
+
+        if (search != null && !search.isBlank()) {
+            String searchLower = search.toLowerCase();
+
+            summaries = summaries.stream()
+                    .filter(dto ->
+                            (dto.getEmployeeName() != null && dto.getEmployeeName().toLowerCase().contains(searchLower)) ||
+                                    (dto.getEmployeeId() != null && dto.getEmployeeId().toLowerCase().contains(searchLower)) ||
+                                    (dto.getClientName() != null && dto.getClientName().toLowerCase().contains(searchLower)) ||
+                                    (dto.getEmployeeType() != null && dto.getEmployeeType().toLowerCase().contains(searchLower)) ||
+                                    (dto.getStatus() != null && dto.getStatus().toLowerCase().contains(searchLower))
+                    )
+                    .collect(Collectors.toList());
+        }
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), summaries.size());
+
+        List<EmployeeMonthlyTimesheetDto> pagedList =
+                (start > summaries.size()) ? Collections.emptyList() : summaries.subList(start, end);
+
+        Page<EmployeeMonthlyTimesheetDto> pageResult =
+                new PageImpl<>(pagedList, pageable, summaries.size());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("data", pageResult.getContent());
+        response.put("currentPage", pageResult.getNumber());
+        response.put("pageSize", pageResult.getSize());
+        response.put("totalPages", pageResult.getTotalPages());
+        response.put("totalElements", pageResult.getTotalElements());
+        return response;
     }
 
     private List<Week> getWeeksMondayToFridayForMonth(LocalDate monthStart, LocalDate monthEnd) {
