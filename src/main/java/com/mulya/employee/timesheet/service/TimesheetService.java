@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -1096,7 +1097,12 @@ public class TimesheetService {
     }
 
 
-    public List<EmployeeMonthlyTimesheetDto> getAllEmployeesMonthlySummary(LocalDate monthStart, LocalDate monthEnd) throws Exception {
+    public Map<String, Object> getAllEmployeesMonthlySummary(
+            LocalDate monthStart,
+            LocalDate monthEnd,
+            Pageable pageable,
+            String search
+    ) throws Exception{
         logger.info("Fetching monthly summaries from {} to {}", monthStart, monthEnd);
 
         // Step 1: Fetch all placement user emails without date filter (all placement users)
@@ -1300,7 +1306,36 @@ public class TimesheetService {
         }
 
         logger.info("Completed processing monthly summaries for {} employees", summaries.size());
-        return summaries;
+        if (search != null && !search.isBlank()) {
+            String searchLower = search.toLowerCase();
+
+            summaries = summaries.stream()
+                    .filter(dto ->
+                            (dto.getEmployeeName() != null && dto.getEmployeeName().toLowerCase().contains(searchLower)) ||
+                                    (dto.getEmployeeId() != null && dto.getEmployeeId().toLowerCase().contains(searchLower)) ||
+                                    (dto.getClientName() != null && dto.getClientName().toLowerCase().contains(searchLower)) ||
+                                    (dto.getEmployeeType() != null && dto.getEmployeeType().toLowerCase().contains(searchLower)) ||
+                                    (dto.getStatus() != null && dto.getStatus().toLowerCase().contains(searchLower))
+                    )
+                    .collect(Collectors.toList());
+        }
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), summaries.size());
+
+        List<EmployeeMonthlyTimesheetDto> pagedList =
+                (start > summaries.size()) ? Collections.emptyList() : summaries.subList(start, end);
+
+        Page<EmployeeMonthlyTimesheetDto> pageResult =
+                new PageImpl<>(pagedList, pageable, summaries.size());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("data", pageResult.getContent());
+        response.put("currentPage", pageResult.getNumber());
+        response.put("pageSize", pageResult.getSize());
+        response.put("totalPages", pageResult.getTotalPages());
+        response.put("totalElements", pageResult.getTotalElements());
+        return response;
     }
 
     private List<Week> getWeeksMondayToFridayForMonth(LocalDate monthStart, LocalDate monthEnd) {
