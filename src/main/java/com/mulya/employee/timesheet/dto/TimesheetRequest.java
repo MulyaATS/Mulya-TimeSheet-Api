@@ -18,6 +18,16 @@ public class TimesheetRequest {
     @NotNull(message = "Entries JSON cannot be null")
     private List<TimesheetEntry> nonWorkingEntries;
 
+    private List<TimesheetEntry> holidays;
+
+    public List<TimesheetEntry> getHolidays() {
+        return holidays;
+    }
+
+    public void setHolidays(List<TimesheetEntry> holidays) {
+        this.holidays = holidays;
+    }
+
     private String notes;
     // Getters and setters
 

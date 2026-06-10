@@ -112,6 +112,9 @@ public class TimesheetService {
 
         List<TimesheetEntry> newWorkingEntries = req.getWorkingEntries();
         List<TimesheetEntry> newNonWorkingEntries = req.getNonWorkingEntries();
+        List<TimesheetEntry> newHolidayEntries =
+                Optional.ofNullable(req.getHolidays())
+                        .orElse(new ArrayList<>());
 
         String employeeEmail = userRegisterClient.getUserEmail(userId);
         String fullEmployeeType = "Unknown";
@@ -143,6 +146,11 @@ public class TimesheetService {
                     .filter(e -> !e.getDate().isBefore(partialStart) && !e.getDate().isAfter(partialEnd))
                     .collect(Collectors.toList());
 
+            List<TimesheetEntry> segmentHolidayEntries = newHolidayEntries.stream()
+                    .filter(e -> !e.getDate().isBefore(partialStart)
+                            && !e.getDate().isAfter(partialEnd))
+                    .collect(Collectors.toList());
+
             Timesheet ts = timesheetRepository.findByUserIdAndWeekStartDate(userId, partialStart)
                     .orElseGet(() -> {
                         Timesheet t = new Timesheet();
@@ -155,6 +163,7 @@ public class TimesheetService {
                         t.setStatus("DRAFT");
                         t.setWorkingHours("[]");
                         t.setNonWorkingHours("[]");
+                        t.setHolidays("[]");
                         t.setPercentageOfTarget(0.0);
                         t.setNotes(note);
                         t.setTimesheetId(generateNextTimesheetId());
@@ -164,6 +173,7 @@ public class TimesheetService {
 
             List<TimesheetEntry> currentWorkingHours;
             List<TimesheetEntry> currentNonWorkingHours;
+
             try {
                 currentWorkingHours = mapper.readValue(ts.getWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
             } catch (Exception e) {
@@ -173,6 +183,15 @@ public class TimesheetService {
                 currentNonWorkingHours = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
             } catch (Exception e) {
                 currentNonWorkingHours = new ArrayList<>();
+            }
+
+            List<TimesheetEntry> currentHolidayEntries;
+            try {
+                currentHolidayEntries = mapper.readValue(
+                        ts.getHolidays(),
+                        new TypeReference<List<TimesheetEntry>>() {});
+            } catch (Exception e) {
+                currentHolidayEntries = new ArrayList<>();
             }
 
             // Remove replaced working entries for dates in segment and merge segment entries
@@ -190,6 +209,15 @@ public class TimesheetService {
             currentNonWorkingHours.removeIf(entry -> segmentNonWorkingDates.contains(entry.getDate()));
             currentNonWorkingHours.addAll(segmentNonWorkingEntries);
 
+            Set<LocalDate> segmentHolidayDates = segmentHolidayEntries.stream()
+                    .map(TimesheetEntry::getDate)
+                    .collect(Collectors.toSet());
+
+            currentHolidayEntries.removeIf(entry ->
+                    segmentHolidayDates.contains(entry.getDate()));
+
+            currentHolidayEntries.addAll(segmentHolidayEntries);
+
             // --- LEAVE CANCELLATION & REFUND LOGIC ---
             Set<LocalDate> newWorkingDates = segmentWorkingEntries.stream()
                     .map(TimesheetEntry::getDate)
@@ -202,7 +230,7 @@ public class TimesheetService {
             try {
                 ts.setWorkingHours(mapper.writeValueAsString(currentWorkingHours));
                 ts.setNonWorkingHours(mapper.writeValueAsString(currentNonWorkingHours));
-            } catch (Exception e) {
+                ts.setHolidays(mapper.writeValueAsString(currentHolidayEntries));            } catch (Exception e) {
                 throw new RuntimeException("Error serializing working/non-working hours JSON", e);
             }
 
@@ -579,6 +607,18 @@ public class TimesheetService {
         dto.setWeekStartDate(ts.getWeekStartDate());
         dto.setWeekEndDate(ts.getWeekEndDate());
         dto.setStatus(ts.getStatus());
+
+        try {
+            dto.setHolidays(
+                    mapper.readValue(
+                            ts.getHolidays(),
+                            new TypeReference<List<TimesheetEntry>>() {}
+                    )
+            );
+        } catch (Exception e) {
+            dto.setHolidays(new ArrayList<>());
+        }
+
 
         List<UserInfoDto> userInfoList = userRegisterClient.getUserInfos(ts.getUserId());
         dto.setEmployeeName(userInfoList.isEmpty() ? "Unknown" : userInfoList.get(0).getUserName());

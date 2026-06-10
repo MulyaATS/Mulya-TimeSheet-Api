@@ -13,6 +13,7 @@ public class TimesheetResponse {
     private TimesheetType timesheetType;
     private List<TimesheetEntry> workingEntries;
     private List<TimesheetEntry> nonWorkingEntries;
+    private List<TimesheetEntry> holidays;
     private String employeeType;
     private LocalDate timesheetDate;
     private LocalDate weekStartDate;

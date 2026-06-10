@@ -1,6 +1,8 @@
 package com.mulya.employee.timesheet.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.persistence.Column;
+import jakarta.persistence.Lob;
 
 import java.time.LocalDate;
 
