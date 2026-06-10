@@ -3,6 +3,7 @@ package com.mulya.employee.timesheet.dto;
 import com.mulya.employee.timesheet.model.TimesheetType;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public class TimesheetSummaryDto {
     private String timesheetId;
@@ -13,6 +14,15 @@ public class TimesheetSummaryDto {
     private LocalDate weekStartDate;
     private LocalDate weekEndDate;
     private String status;
+    private List<TimesheetEntry> holidays;
+
+    public List<TimesheetEntry> getHolidays() {
+        return holidays;
+    }
+
+    public void setHolidays(List<TimesheetEntry> holidays) {
+        this.holidays = holidays;
+    }
 
     public String getTimesheetId() {
         return timesheetId;
@@ -76,4 +86,5 @@ public class TimesheetSummaryDto {
     public void setStatus(String status) {
         this.status = status;
     }
+
 }

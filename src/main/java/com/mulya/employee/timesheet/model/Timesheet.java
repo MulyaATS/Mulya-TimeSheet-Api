@@ -44,6 +44,10 @@ public class Timesheet {
     @Column(columnDefinition = "TEXT")
     private String workingHours;
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String holidays;
+
 
     @Column(nullable = false)
     private Double percentageOfTarget; // e.g. hours / 40 * 100
@@ -138,4 +142,12 @@ public class Timesheet {
     }
     public void setNotes(String notes) {
         this.notes = notes;}
+
+    public String getHolidays() {
+        return holidays;
+    }
+
+    public void setHolidays(String holidays) {
+        this.holidays = holidays;
+    }
 }
