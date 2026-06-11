@@ -111,5 +111,8 @@ public class TimesheetResponse {
     public List<AttachmentDto> getAttachments() { return attachments; }
     public void setAttachments(List<AttachmentDto> attachments) { this.attachments = attachments; }
 
+    public List<TimesheetEntry> getHolidays() {return holidays;}
+    public void setHolidays(List<TimesheetEntry> holidays) {this.holidays = holidays;}
+
 
 }
