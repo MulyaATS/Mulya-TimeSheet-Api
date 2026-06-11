@@ -112,8 +112,7 @@ public class TimesheetService {
 
         List<TimesheetEntry> newWorkingEntries = req.getWorkingEntries();
         List<TimesheetEntry> newNonWorkingEntries = req.getNonWorkingEntries();
-        List<TimesheetEntry> newHolidayEntries =
-                Optional.ofNullable(req.getHolidays())
+        List<TimesheetEntry> newHolidayEntries = Optional.ofNullable(req.getHolidays())
                         .orElse(new ArrayList<>());
 
         String employeeEmail = userRegisterClient.getUserEmail(userId);
@@ -147,7 +146,7 @@ public class TimesheetService {
                     .collect(Collectors.toList());
 
             List<TimesheetEntry> segmentHolidayEntries = newHolidayEntries.stream()
-                    .filter(e -> !e.getDate().isBefore(partialStart)
+                      .filter(e -> !e.getDate().isBefore(partialStart)
                             && !e.getDate().isAfter(partialEnd))
                     .collect(Collectors.toList());
 
@@ -674,6 +673,14 @@ public class TimesheetService {
                                 return !d.isBefore(monthStart) && !d.isAfter(monthEnd);
                             }).collect(Collectors.toList()));
 
+                    if (resp.getHolidays() != null) {
+                        resp.setHolidays(resp.getHolidays().stream()
+                                .filter(e -> {
+                                    LocalDate d = e.getDate();
+                                    return !d.isBefore(monthStart) && !d.isAfter(monthEnd);
+                                }).collect(Collectors.toList()));
+                    }
+
                     try {
                         double sumThisSheet = resp.getWorkingEntries().stream()
                                 .mapToDouble(TimesheetEntry::getHours)
@@ -778,6 +785,17 @@ public class TimesheetService {
             resp.setNonWorkingEntries(List.of());
         }
 
+        try {
+            resp.setHolidays(
+                    mapper.readValue(
+                            ts.getHolidays(),
+                            new TypeReference<List<TimesheetEntry>>() {}
+                    )
+            );
+        } catch (Exception e) {
+            resp.setHolidays(new ArrayList<>());
+        }
+
         resp.setPercentageOfTarget(ts.getPercentageOfTarget());
         resp.setStatus(ts.getStatus());
         resp.setApprover(approvalName == null ? "null" : approvalName.getUserName());
@@ -872,6 +890,17 @@ public class TimesheetService {
             System.err.println("❌ Failed to parse 'nonWorkingHours' JSON for Timesheet ID: " + ts.getTimesheetId());
             e.printStackTrace();
             resp.setNonWorkingEntries(List.of());
+        }
+
+        try {
+            resp.setHolidays(mapper.readValue(
+                    ts.getHolidays(),
+                    new TypeReference<List<TimesheetEntry>>() {})
+            );
+        } catch (Exception e) {
+            System.err.println("❌ Failed to parse 'holidays' JSON for Timesheet ID: " + ts.getTimesheetId());
+            e.printStackTrace();
+            resp.setHolidays(List.of());
         }
 
         // Now calculate proportional target percentage adjusted for leaves with isFullTime flag
