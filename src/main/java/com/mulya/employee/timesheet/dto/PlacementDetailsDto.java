@@ -13,6 +13,11 @@ public class PlacementDetailsDto {
     private String employeeType;
     private String VendorName;
     private String employeeWorkingType;
+    @JsonProperty("candidateId")
+    private String candidateId;
+    @JsonProperty("id")
+    private String id;
+    private LocalDate endDate;
     // Add candidate email
     @JsonProperty("candidateEmailId")
     private String candidateEmail;
@@ -60,4 +65,28 @@ public class PlacementDetailsDto {
     }
     public void setVendorName(String vendorName) {
         VendorName = vendorName;}
+
+    public String getCandidateId() {
+        return candidateId;
+    }
+
+    public void setCandidateId(String candidateId) {
+        this.candidateId = candidateId;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
 }
