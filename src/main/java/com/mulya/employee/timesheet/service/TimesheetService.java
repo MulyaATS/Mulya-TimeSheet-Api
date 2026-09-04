@@ -1383,13 +1383,18 @@ public class TimesheetService {
     }
 
     public List<EmployeeYearlyTimesheetDto> getYearlyDashboard(int year) {
+        return getYearlyDashboard(year, null);
+    }
+
+    public List<EmployeeYearlyTimesheetDto> getYearlyDashboard(int year, String entity) {
+        boolean usEntity = entity != null && "US".equalsIgnoreCase(entity.trim());
         LocalDate yearStart = LocalDate.of(year, 1, 1);
         LocalDate yearEnd = LocalDate.of(year, 12, 31);
-        logger.info("Fetching yearly timesheet dashboard for {}", year);
+        logger.info("Fetching yearly timesheet dashboard for {} entity={}", year, usEntity ? "US" : "IN");
 
         List<PlacementDetailsDto> placements;
         try {
-            placements = candidateClient.getAllPlacements();
+            placements = candidateClient.getAllPlacements(usEntity ? "US" : null);
         } catch (Exception ex) {
             logger.warn("Unable to load placements for yearly dashboard: {}", ex.getMessage());
             placements = Collections.emptyList();
@@ -1404,7 +1409,7 @@ public class TimesheetService {
             placementByEmail.putIfAbsent(email, placement);
         }
 
-        Map<String, String> emailToUserId = new HashMap<>();
+        Map<String, String> emailToUserId = new LinkedHashMap<>();
         for (String email : placementByEmail.keySet()) {
             try {
                 String userId = userRegisterClient.getUserIdByEmail(email);
@@ -1416,41 +1421,63 @@ public class TimesheetService {
             }
         }
 
-        Set<String> userIds = new HashSet<>(emailToUserId.values());
-        List<Timesheet> yearTimesheets = userIds.isEmpty()
+        // US: include every placement email (even without a registered user). IN: only registered users.
+        Set<String> timesheetUserIds = new HashSet<>(emailToUserId.values());
+        List<Timesheet> yearTimesheets = timesheetUserIds.isEmpty()
                 ? Collections.emptyList()
                 : timesheetRepository.findByWeekStartDateBetween(yearStart.minusDays(7), yearEnd)
                     .stream()
-                    .filter(t -> userIds.contains(t.getUserId()))
+                    .filter(t -> timesheetUserIds.contains(t.getUserId()))
                     .collect(Collectors.toList());
 
         Map<String, List<Timesheet>> timesheetsByUser = yearTimesheets.stream()
                 .collect(Collectors.groupingBy(Timesheet::getUserId));
 
-        Map<String, List<TimesheetMonthlyHourOverride>> overridesByUser = userIds.isEmpty()
+        Set<String> overrideKeys = new HashSet<>(emailToUserId.values());
+        if (usEntity) {
+            overrideKeys.addAll(placementByEmail.keySet());
+        }
+        Map<String, List<TimesheetMonthlyHourOverride>> overridesByKey = overrideKeys.isEmpty()
                 ? Collections.emptyMap()
-                : monthlyHourOverrideRepository.findByUserIdInAndYear(userIds, year).stream()
+                : monthlyHourOverrideRepository.findByUserIdInAndYear(overrideKeys, year).stream()
                     .collect(Collectors.groupingBy(TimesheetMonthlyHourOverride::getUserId));
 
         List<EmployeeYearlyTimesheetDto> rows = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : emailToUserId.entrySet()) {
-            String email = entry.getKey();
-            String userId = entry.getValue();
-            PlacementDetailsDto placement = placementByEmail.get(email);
+        Iterable<Map.Entry<String, PlacementDetailsDto>> rowSource = usEntity
+                ? placementByEmail.entrySet()
+                : emailToUserId.entrySet().stream()
+                    .map(e -> Map.entry(e.getKey(), placementByEmail.get(e.getKey())))
+                    .collect(Collectors.toList());
 
-            LocalDate joiningDate = placement != null ? placement.getStartDate() : null;
+        for (Map.Entry<String, PlacementDetailsDto> entry : rowSource) {
+            String email = entry.getKey();
+            PlacementDetailsDto placement = entry.getValue();
+            if (placement == null) {
+                continue;
+            }
+            String userId = emailToUserId.get(email);
+            String rowKey = (userId != null && !userId.isBlank())
+                    ? userId
+                    : (usEntity ? email : null);
+            if (rowKey == null) {
+                continue;
+            }
+
+            LocalDate joiningDate = placement.getStartDate();
             if (joiningDate != null && joiningDate.isAfter(yearEnd)) {
                 continue;
             }
 
-            String employeeType = placement != null && placement.getEmployeeType() != null
+            String employeeType = placement.getEmployeeType() != null
                     ? placement.getEmployeeType()
                     : "Unknown";
             boolean includeLeaveHours = "C2C".equalsIgnoreCase(employeeType);
 
             double[] monthHours = new double[12];
-            List<Timesheet> empTimesheets = timesheetsByUser.getOrDefault(userId, Collections.emptyList());
+            List<Timesheet> empTimesheets = userId == null
+                    ? Collections.emptyList()
+                    : timesheetsByUser.getOrDefault(userId, Collections.emptyList());
             for (Timesheet ts : empTimesheets) {
                 addHoursToYear(ts.getWorkingHours(), year, monthHours);
                 if (includeLeaveHours) {
@@ -1458,14 +1485,22 @@ public class TimesheetService {
                 }
             }
 
-            String employeeName = "Unknown";
-            try {
-                List<UserInfoDto> userInfoList = userRegisterClient.getUserInfos(userId);
-                if (userInfoList != null && !userInfoList.isEmpty() && userInfoList.get(0).getUserName() != null) {
-                    employeeName = userInfoList.get(0).getUserName();
+            String employeeName = null;
+            if (usEntity) {
+                employeeName = placement.getCandidateFullName();
+            }
+            if (employeeName == null || employeeName.isBlank()) {
+                employeeName = "Unknown";
+                if (userId != null) {
+                    try {
+                        List<UserInfoDto> userInfoList = userRegisterClient.getUserInfos(userId);
+                        if (userInfoList != null && !userInfoList.isEmpty() && userInfoList.get(0).getUserName() != null) {
+                            employeeName = userInfoList.get(0).getUserName();
+                        }
+                    } catch (Exception ex) {
+                        logger.warn("Unable to resolve username for {}: {}", userId, ex.getMessage());
+                    }
                 }
-            } catch (Exception ex) {
-                logger.warn("Unable to resolve username for {}: {}", userId, ex.getMessage());
             }
 
             List<Integer> monthlyHours = new ArrayList<>(12);
@@ -1476,21 +1511,21 @@ public class TimesheetService {
                 totalHours += rounded;
             }
 
-            applyMonthlyHourOverrides(overridesByUser.get(userId), monthlyHours);
+            applyMonthlyHourOverrides(overridesByKey.get(rowKey), monthlyHours);
             totalHours = monthlyHours.stream().mapToInt(Integer::intValue).sum();
 
             EmployeeYearlyTimesheetDto dto = new EmployeeYearlyTimesheetDto();
-            String candidateId = placement != null && placement.getCandidateId() != null && !placement.getCandidateId().isBlank()
+            String candidateId = placement.getCandidateId() != null && !placement.getCandidateId().isBlank()
                     ? placement.getCandidateId()
-                    : (placement != null ? placement.getId() : userId);
+                    : (placement.getId() != null ? placement.getId() : rowKey);
             dto.setCandidateId(candidateId);
-            dto.setEmployeeId(userId);
+            dto.setEmployeeId(rowKey);
             dto.setCandidateName(employeeName);
             dto.setEmploymentType(employeeType);
-            dto.setVendor(placement != null ? placement.getVendorName() : null);
-            dto.setClient(placement != null ? placement.getClientName() : null);
+            dto.setVendor(placement.getVendorName());
+            dto.setClient(placement.getClientName());
             dto.setStartDate(joiningDate);
-            dto.setEndDate(placement != null ? placement.getEndDate() : null);
+            dto.setEndDate(placement.getEndDate());
             dto.setMonthlyHours(monthlyHours);
             dto.setTotalHours(totalHours);
             rows.add(dto);
@@ -1499,7 +1534,7 @@ public class TimesheetService {
         rows.sort(Comparator.comparing(
                 EmployeeYearlyTimesheetDto::getCandidateName,
                 Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
-        logger.info("Yearly dashboard ready for {} employees", rows.size());
+        logger.info("Yearly dashboard ready for {} employees (entity={})", rows.size(), usEntity ? "US" : "IN");
         return rows;
     }
 
@@ -1517,6 +1552,7 @@ public class TimesheetService {
 
         String userId = request.getEmployeeId();
         int year = request.getYear();
+        String entity = request.getEntity();
 
         for (int monthIndex = 0; monthIndex < 12; monthIndex++) {
             Integer hoursValue = request.getMonthlyHours().get(monthIndex);
@@ -1533,7 +1569,7 @@ public class TimesheetService {
             monthlyHourOverrideRepository.save(override);
         }
 
-        return getYearlyDashboard(year).stream()
+        return getYearlyDashboard(year, entity).stream()
                 .filter(row -> userId.equals(row.getEmployeeId()))
                 .findFirst()
                 .orElseGet(() -> {

@@ -11,16 +11,20 @@ public class PlacementDetailsDto {
     private String clientName;
     @JsonProperty("employmentType")
     private String employeeType;
-    private String VendorName;
+    @JsonProperty("vendorName")
+    private String vendorName;
     private String employeeWorkingType;
     @JsonProperty("candidateId")
     private String candidateId;
     @JsonProperty("id")
     private String id;
     private LocalDate endDate;
-    // Add candidate email
     @JsonProperty("candidateEmailId")
     private String candidateEmail;
+    @JsonProperty("userId")
+    private String userId;
+    @JsonProperty("candidateFullName")
+    private String candidateFullName;
 
     public String getCandidateEmail() {
         return candidateEmail;
@@ -61,10 +65,11 @@ public class PlacementDetailsDto {
     }
 
     public String getVendorName() {
-        return VendorName;
+        return vendorName;
     }
     public void setVendorName(String vendorName) {
-        VendorName = vendorName;}
+        this.vendorName = vendorName;
+    }
 
     public String getCandidateId() {
         return candidateId;
@@ -88,5 +93,21 @@ public class PlacementDetailsDto {
 
     public void setEndDate(LocalDate endDate) {
         this.endDate = endDate;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    public String getCandidateFullName() {
+        return candidateFullName;
+    }
+
+    public void setCandidateFullName(String candidateFullName) {
+        this.candidateFullName = candidateFullName;
     }
 }

@@ -345,10 +345,11 @@ public class TimesheetController {
 
     @GetMapping("/yearly-dashboard")
     public ResponseEntity<ApiResponse<List<EmployeeYearlyTimesheetDto>>> getYearlyDashboard(
-            @RequestParam(required = false) Integer year
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String entity
     ) {
         int dashboardYear = year == null ? LocalDate.now().getYear() : year;
-        List<EmployeeYearlyTimesheetDto> rows = timesheetService.getYearlyDashboard(dashboardYear);
+        List<EmployeeYearlyTimesheetDto> rows = timesheetService.getYearlyDashboard(dashboardYear, entity);
         return ResponseEntity.ok(ApiResponse.success("Yearly timesheet dashboard fetched", rows));
     }
 

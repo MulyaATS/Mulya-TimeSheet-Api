@@ -131,28 +131,43 @@ public class CandidateClient {
     }
 
     public List<PlacementDetailsDto> getAllPlacements() {
-        String url = UriComponentsBuilder.fromHttpUrl(candidateServiceBaseUrl + "/placement/placements-list").toUriString();
-        System.out.println("Fetching all placements from URL: {}"+ url);
+        return getAllPlacements(null);
+    }
+
+    /**
+     * @param entity "US" fetches US placements; anything else uses India placements list.
+     */
+    public List<PlacementDetailsDto> getAllPlacements(String entity) {
+        boolean usEntity = entity != null && "US".equalsIgnoreCase(entity.trim());
+        UriComponentsBuilder builder = usEntity
+                ? UriComponentsBuilder.fromHttpUrl(candidateServiceBaseUrl + "/us-placement/placements-list")
+                    .queryParam("page", 0)
+                    .queryParam("size", 10000)
+                : UriComponentsBuilder.fromHttpUrl(candidateServiceBaseUrl + "/placement/placements-list");
+        String url = builder.toUriString();
+        System.out.println("Fetching placements (" + (usEntity ? "US" : "IN") + ") from URL: " + url);
 
         try {
-            ResponseEntity<ApiResponse<List<PlacementDetailsDto>>> response = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     url,
                     HttpMethod.GET,
                     null,
-                    new ParameterizedTypeReference<>() {
-                    });
+                    new ParameterizedTypeReference<Map<String, Object>>() {}
+            );
 
-            ApiResponse<List<PlacementDetailsDto>> responseBody = response.getBody();
-
-            if (responseBody != null && responseBody.isSuccess()) {
-                System.out.println("Successfully fetched {} placement records" + responseBody.getData().size());
-                return responseBody.getData();
-            } else {
-                System.out.println("No placements found or empty response");
-                throw new RuntimeException("No placements found in candidate service");
+            Map<String, Object> body = response.getBody();
+            List<PlacementDetailsDto> placements = null;
+            if (body != null && body.containsKey("data")) {
+                placements = mapper.convertValue(body.get("data"), new TypeReference<List<PlacementDetailsDto>>() {});
             }
+
+            if (placements == null) {
+                return List.of();
+            }
+            System.out.println("Successfully fetched " + placements.size() + " placement records");
+            return placements;
         } catch (Exception e) {
-            System.out.println("Error fetching placements from candidate service" + e);
+            System.out.println("Error fetching placements from candidate service: " + e.getMessage());
             throw new RuntimeException("Failed to fetch placements: " + e.getMessage());
         }
     }
