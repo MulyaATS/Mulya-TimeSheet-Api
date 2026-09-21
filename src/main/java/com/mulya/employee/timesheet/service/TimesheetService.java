@@ -16,6 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -1380,6 +1382,35 @@ public class TimesheetService {
 
         logger.info("Completed processing monthly summaries for {} employees", summaries.size());
         return summaries;
+    }
+
+    public Page<EmployeeMonthlyTimesheetDto> getAllEmployeesMonthlySummary(
+            LocalDate monthStart, LocalDate monthEnd, String search, Pageable pageable) throws Exception {
+        List<EmployeeMonthlyTimesheetDto> summaries = getAllEmployeesMonthlySummary(monthStart, monthEnd);
+        if (search != null && !search.isBlank()) {
+            String query = search.trim().toLowerCase();
+            summaries = summaries.stream()
+                    .filter(row -> matchesMonthlySearch(row, query))
+                    .collect(Collectors.toList());
+        }
+        Pageable safePageable = pageable == null ? PageRequest.of(0, 20) : pageable;
+        int start = (int) safePageable.getOffset();
+        int end = Math.min(start + safePageable.getPageSize(), summaries.size());
+        List<EmployeeMonthlyTimesheetDto> pageContent =
+                start >= summaries.size() ? Collections.emptyList() : summaries.subList(start, end);
+        return new PageImpl<>(pageContent, safePageable, summaries.size());
+    }
+
+    private boolean matchesMonthlySearch(EmployeeMonthlyTimesheetDto row, String query) {
+        return containsIgnoreCase(row.getEmployeeName(), query)
+                || containsIgnoreCase(row.getEmployeeId(), query)
+                || containsIgnoreCase(row.getClientName(), query)
+                || containsIgnoreCase(row.getEmployeeType(), query)
+                || containsIgnoreCase(row.getStatus(), query);
+    }
+
+    private boolean containsIgnoreCase(String value, String query) {
+        return value != null && value.toLowerCase().contains(query);
     }
 
     public List<EmployeeYearlyTimesheetDto> getYearlyDashboard(int year) {

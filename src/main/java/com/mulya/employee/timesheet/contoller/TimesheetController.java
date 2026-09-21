@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -26,7 +27,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -329,18 +332,30 @@ public class TimesheetController {
     }
 
     @GetMapping("/monthly-timesheets")
-    public ResponseEntity<ApiResponse<List<EmployeeMonthlyTimesheetDto>>> getAllEmployeeMonthlySummary(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getAllEmployeeMonthlySummary(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthStart,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthEnd
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate monthEnd,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) throws Exception {
 
         LocalDate normalizedStart = monthStart.withDayOfMonth(1);
         LocalDate normalizedEnd = (monthEnd == null) ? normalizedStart.withDayOfMonth(normalizedStart.lengthOfMonth())
                 : monthEnd.withDayOfMonth(monthEnd.lengthOfMonth());
 
-        List<EmployeeMonthlyTimesheetDto> summaries = timesheetService.getAllEmployeesMonthlySummary(normalizedStart, normalizedEnd);
+        int safeSize = size <= 0 ? 20 : Math.min(size, 100);
+        int safePage = Math.max(page, 0);
+        Page<EmployeeMonthlyTimesheetDto> summaries = timesheetService.getAllEmployeesMonthlySummary(
+                normalizedStart, normalizedEnd, search, PageRequest.of(safePage, safeSize));
 
-        return ResponseEntity.ok(ApiResponse.success("Monthly timesheet summaries fetched", summaries));
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("content", summaries.getContent());
+        payload.put("page", summaries.getNumber());
+        payload.put("size", summaries.getSize());
+        payload.put("totalElements", summaries.getTotalElements());
+        payload.put("totalPages", summaries.getTotalPages());
+        return ResponseEntity.ok(ApiResponse.success("Monthly timesheet summaries fetched", payload));
     }
 
     @GetMapping("/yearly-dashboard")
