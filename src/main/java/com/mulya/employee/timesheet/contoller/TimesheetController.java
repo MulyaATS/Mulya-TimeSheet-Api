@@ -470,75 +470,19 @@ public class TimesheetController {
     }
 
     @GetMapping("/in-yearly-dashboard/active")
-    public ResponseEntity<ApiResponse<List<EmployeeMonthlyTimesheetDto>>>
-    getActiveEmployeesMonthlySummary(
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate monthStart,
+    public ResponseEntity<ApiResponse<List<EmployeeYearlyTimesheetDto>>> getActiveIndianYearlyDashboard(
+            @RequestParam(required = false) Integer year) {
+            int dashboardYear = year == null ? LocalDate.now().getYear() : year;
+        List<EmployeeYearlyTimesheetDto> rows = timesheetService.getActiveIndianYearlyDashboard(dashboardYear);
 
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate monthEnd
-    ) throws Exception {
-
-        LocalDate normalizedStart =
-                monthStart.withDayOfMonth(1);
-
-        LocalDate normalizedEnd =
-                monthEnd == null
-                        ? normalizedStart.withDayOfMonth(
-                        normalizedStart.lengthOfMonth())
-                        : monthEnd.withDayOfMonth(
-                        monthEnd.lengthOfMonth());
-
-        List<EmployeeMonthlyTimesheetDto> summaries =
-                timesheetService.getActiveEmployeesMonthlySummary(
-                        normalizedStart,
-                        normalizedEnd
-                );
-
-        return ResponseEntity.ok(
-                ApiResponse.success(
-                        "Active Indian monthly timesheet summaries fetched",
-                        summaries
-                )
-        );
+        return ResponseEntity.ok(ApiResponse.success("Active Indian yearly timesheet dashboard fetched", rows));
     }
-
-
     @GetMapping("/in-yearly-dashboard/inactive")
-    public ResponseEntity<ApiResponse<List<EmployeeMonthlyTimesheetDto>>>
-    getInactiveEmployeesMonthlySummary(
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate monthStart,
+    public ResponseEntity<ApiResponse<List<EmployeeYearlyTimesheetDto>>> getInactiveIndianYearlyDashboard(
+            @RequestParam(required = false) Integer year) {
+            int dashboardYear = year == null ? LocalDate.now().getYear() : year;
+        List<EmployeeYearlyTimesheetDto> rows = timesheetService.getInactiveIndianYearlyDashboard(dashboardYear);
 
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate monthEnd
-    ) throws Exception {
-
-        LocalDate normalizedStart =
-                monthStart.withDayOfMonth(1);
-
-        LocalDate normalizedEnd =
-                monthEnd == null
-                        ? normalizedStart.withDayOfMonth(
-                        normalizedStart.lengthOfMonth())
-                        : monthEnd.withDayOfMonth(
-                        monthEnd.lengthOfMonth());
-
-        List<EmployeeMonthlyTimesheetDto> summaries =
-                timesheetService.getInactiveEmployeesMonthlySummary(
-                        normalizedStart,
-                        normalizedEnd
-                );
-
-        return ResponseEntity.ok(
-                ApiResponse.success(
-                        "Inactive Indian monthly timesheet summaries fetched",
-                        summaries
-                )
-        );
+        return ResponseEntity.ok(ApiResponse.success("Inactive Indian yearly timesheet dashboard fetched", rows));
     }
 }

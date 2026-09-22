@@ -118,7 +118,7 @@ public class TimesheetService {
         List<TimesheetEntry> newWorkingEntries = req.getWorkingEntries();
         List<TimesheetEntry> newNonWorkingEntries = req.getNonWorkingEntries();
         List<TimesheetEntry> newHolidayEntries = Optional.ofNullable(req.getHolidays())
-                        .orElse(new ArrayList<>());
+                .orElse(new ArrayList<>());
 
         String employeeEmail = userRegisterClient.getUserEmail(userId);
         String fullEmployeeType = "Unknown";
@@ -151,7 +151,7 @@ public class TimesheetService {
                     .collect(Collectors.toList());
 
             List<TimesheetEntry> segmentHolidayEntries = newHolidayEntries.stream()
-                      .filter(e -> !e.getDate().isBefore(partialStart)
+                    .filter(e -> !e.getDate().isBefore(partialStart)
                             && !e.getDate().isAfter(partialEnd))
                     .collect(Collectors.toList());
 
@@ -179,12 +179,14 @@ public class TimesheetService {
             List<TimesheetEntry> currentNonWorkingHours;
 
             try {
-                currentWorkingHours = mapper.readValue(ts.getWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
+                currentWorkingHours = mapper.readValue(ts.getWorkingHours(), new TypeReference<List<TimesheetEntry>>() {
+                });
             } catch (Exception e) {
                 currentWorkingHours = new ArrayList<>();
             }
             try {
-                currentNonWorkingHours = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
+                currentNonWorkingHours = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<List<TimesheetEntry>>() {
+                });
             } catch (Exception e) {
                 currentNonWorkingHours = new ArrayList<>();
             }
@@ -193,7 +195,8 @@ public class TimesheetService {
             try {
                 currentHolidayEntries = mapper.readValue(
                         ts.getHolidays(),
-                        new TypeReference<List<TimesheetEntry>>() {});
+                        new TypeReference<List<TimesheetEntry>>() {
+                        });
             } catch (Exception e) {
                 currentHolidayEntries = new ArrayList<>();
             }
@@ -234,7 +237,8 @@ public class TimesheetService {
             try {
                 ts.setWorkingHours(mapper.writeValueAsString(currentWorkingHours));
                 ts.setNonWorkingHours(mapper.writeValueAsString(currentNonWorkingHours));
-                ts.setHolidays(mapper.writeValueAsString(currentHolidayEntries));            } catch (Exception e) {
+                ts.setHolidays(mapper.writeValueAsString(currentHolidayEntries));
+            } catch (Exception e) {
                 throw new RuntimeException("Error serializing working/non-working hours JSON", e);
             }
 
@@ -316,7 +320,6 @@ public class TimesheetService {
         }
         return segments;
     }
-
 
 
     private String fetchEmployeeWorkingTypeFromPlacements(String userId) throws Exception {
@@ -436,7 +439,7 @@ public class TimesheetService {
 
             emailService.sendManagerApprovalRequestEmail(
                     ts,
-                   // managerDto.getEmail(),
+                    // managerDto.getEmail(),
                     "ts.in@adroitinnovative.com",
                     managerInfo.getUserName(),
                     empInfo.getUserName()
@@ -475,7 +478,6 @@ public class TimesheetService {
 
         return timesheetRepository.save(ts);
     }
-
 
 
     @Transactional
@@ -600,8 +602,6 @@ public class TimesheetService {
     }
 
 
-
-
     public TimesheetSummaryDto toSummaryDto(Timesheet ts) {
         TimesheetSummaryDto dto = new TimesheetSummaryDto();
         dto.setTimesheetId(ts.getTimesheetId());
@@ -616,7 +616,8 @@ public class TimesheetService {
             dto.setHolidays(
                     mapper.readValue(
                             ts.getHolidays(),
-                            new TypeReference<List<TimesheetEntry>>() {}
+                            new TypeReference<List<TimesheetEntry>>() {
+                            }
                     )
             );
         } catch (Exception e) {
@@ -707,7 +708,6 @@ public class TimesheetService {
     }
 
 
-
     public List<TimesheetResponse> getAllTimesheetsByUserId(String userId) {
         List<Timesheet> timesheets = timesheetRepository.findByUserId(userId);
         return timesheets.stream()
@@ -771,7 +771,8 @@ public class TimesheetService {
         try {
             resp.setWorkingEntries(mapper.readValue(
                     ts.getWorkingHours(),
-                    new TypeReference<List<TimesheetEntry>>() {}
+                    new TypeReference<List<TimesheetEntry>>() {
+                    }
             ));
         } catch (Exception e) {
             System.err.println("❌ Failed to parse 'workingHours' JSON for Timesheet ID: " + ts.getTimesheetId());
@@ -782,7 +783,8 @@ public class TimesheetService {
         try {
             resp.setNonWorkingEntries(mapper.readValue(
                     ts.getNonWorkingHours(),
-                    new TypeReference<List<TimesheetEntry>>() {}
+                    new TypeReference<List<TimesheetEntry>>() {
+                    }
             ));
         } catch (Exception e) {
             System.err.println("❌ Failed to parse 'nonWorkingHours' JSON for Timesheet ID: " + ts.getTimesheetId());
@@ -794,7 +796,8 @@ public class TimesheetService {
             resp.setHolidays(
                     mapper.readValue(
                             ts.getHolidays(),
-                            new TypeReference<List<TimesheetEntry>>() {}
+                            new TypeReference<List<TimesheetEntry>>() {
+                            }
                     )
             );
         } catch (Exception e) {
@@ -878,7 +881,8 @@ public class TimesheetService {
         try {
             resp.setWorkingEntries(mapper.readValue(
                     ts.getWorkingHours(),
-                    new TypeReference<List<TimesheetEntry>>() {}
+                    new TypeReference<List<TimesheetEntry>>() {
+                    }
             ));
         } catch (Exception e) {
             System.err.println("❌ Failed to parse 'workingHours' JSON for Timesheet ID: " + ts.getTimesheetId());
@@ -889,7 +893,8 @@ public class TimesheetService {
         try {
             resp.setNonWorkingEntries(mapper.readValue(
                     ts.getNonWorkingHours(),
-                    new TypeReference<List<TimesheetEntry>>() {}
+                    new TypeReference<List<TimesheetEntry>>() {
+                    }
             ));
         } catch (Exception e) {
             System.err.println("❌ Failed to parse 'nonWorkingHours' JSON for Timesheet ID: " + ts.getTimesheetId());
@@ -900,7 +905,8 @@ public class TimesheetService {
         try {
             resp.setHolidays(mapper.readValue(
                     ts.getHolidays(),
-                    new TypeReference<List<TimesheetEntry>>() {})
+                    new TypeReference<List<TimesheetEntry>>() {
+                    })
             );
         } catch (Exception e) {
             System.err.println("❌ Failed to parse 'holidays' JSON for Timesheet ID: " + ts.getTimesheetId());
@@ -961,8 +967,10 @@ public class TimesheetService {
         List<TimesheetEntry> nonWorkingEntries = List.of();
 
         try {
-            workingEntries = mapper.readValue(ts.getWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
-            nonWorkingEntries = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
+            workingEntries = mapper.readValue(ts.getWorkingHours(), new TypeReference<List<TimesheetEntry>>() {
+            });
+            nonWorkingEntries = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<List<TimesheetEntry>>() {
+            });
         } catch (Exception e) {
             System.err.println("Failed to parse entries for Timesheet ID: " + ts.getTimesheetId());
             e.printStackTrace();
@@ -1049,12 +1057,14 @@ public class TimesheetService {
         List<TimesheetEntry> currentWorkingEntries;
         List<TimesheetEntry> currentNonWorkingEntries;
         try {
-            currentWorkingEntries = mapper.readValue(ts.getWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
+            currentWorkingEntries = mapper.readValue(ts.getWorkingHours(), new TypeReference<List<TimesheetEntry>>() {
+            });
         } catch (Exception e) {
             currentWorkingEntries = new ArrayList<>();
         }
         try {
-            currentNonWorkingEntries = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
+            currentNonWorkingEntries = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<List<TimesheetEntry>>() {
+            });
         } catch (Exception e) {
             currentNonWorkingEntries = new ArrayList<>();
         }
@@ -1106,7 +1116,8 @@ public class TimesheetService {
                 if (existingEntry.getDate().equals(updatedEntry.getDate())) {
                     if (updatedEntry.getProject() != null) existingEntry.setProject(updatedEntry.getProject());
                     if (updatedEntry.getHours() != null) existingEntry.setHours(updatedEntry.getHours());
-                    if (updatedEntry.getDescription() != null) existingEntry.setDescription(updatedEntry.getDescription());
+                    if (updatedEntry.getDescription() != null)
+                        existingEntry.setDescription(updatedEntry.getDescription());
                     currentEntries.set(i, existingEntry);
                     matched = true;
                     break;
@@ -1304,8 +1315,10 @@ public class TimesheetService {
 
                 Week currentWeek = calendarWeeks.get(weekIndex);
 
-                List<TimesheetEntry> workingEntries = mapper.readValue(ts.getWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
-                List<TimesheetEntry> nonWorkingEntries = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<List<TimesheetEntry>>() {});
+                List<TimesheetEntry> workingEntries = mapper.readValue(ts.getWorkingHours(), new TypeReference<List<TimesheetEntry>>() {
+                });
+                List<TimesheetEntry> nonWorkingEntries = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<List<TimesheetEntry>>() {
+                });
 
                 double workHours = workingEntries.stream()
                         .filter(e -> currentWeek.daysInsideMonth.contains(LocalDate.parse(e.getDate().toString())))
@@ -1611,6 +1624,7 @@ public class TimesheetService {
         logger.info("Yearly dashboard ready for {} employees (entity={})", rows.size(), usEntity ? "US" : "IN");
         return rows;
     }
+
     @Transactional
     public EmployeeYearlyTimesheetDto saveYearlyDashboardHours(YearlyHoursUpdateRequest request) {
         if (request == null || request.getEmployeeId() == null || request.getEmployeeId().isBlank()) {
@@ -1676,7 +1690,8 @@ public class TimesheetService {
             return;
         }
         try {
-            List<TimesheetEntry> entries = mapper.readValue(hoursJson, new TypeReference<List<TimesheetEntry>>() {});
+            List<TimesheetEntry> entries = mapper.readValue(hoursJson, new TypeReference<List<TimesheetEntry>>() {
+            });
             if (entries == null) {
                 return;
             }
@@ -1886,6 +1901,7 @@ public class TimesheetService {
                 })
                 .collect(Collectors.toList());
     }
+
     public List<EmployeeYearlyTimesheetDto> getActiveUSYearlyDashboard(int year) {
 
         List<EmployeeYearlyTimesheetDto> rows =
@@ -1950,59 +1966,45 @@ public class TimesheetService {
                 .collect(Collectors.toList());
     }
 
-    public List<EmployeeMonthlyTimesheetDto> getActiveEmployeesMonthlySummary(
-            LocalDate monthStart,
-            LocalDate monthEnd) throws Exception {
-
-        List<EmployeeMonthlyTimesheetDto> summaries = getAllEmployeesMonthlySummary(monthStart, monthEnd);
-        YearMonth selectedMonth = YearMonth.from(monthStart);
-
-        return summaries.stream().filter(row -> {
-                    LocalDate startDate = row.getJoiningDate();
-                    LocalDate endDate = row.getEndDate();
-
-                    if (startDate == null) {
-                        return false;
-                    }
-
-                    YearMonth startMonth =
-                            YearMonth.from(startDate);
-                    if (startMonth.isAfter(selectedMonth)) {
-                        return false;
-                    }
-
-                    if (endDate == null) {
-                        return true;
-                    }
-
-                    YearMonth endMonth = YearMonth.from(endDate);
-                    return !endMonth.isBefore(selectedMonth);})
+    public List<EmployeeYearlyTimesheetDto> getActiveIndianYearlyDashboard(int year) {
+        List<EmployeeYearlyTimesheetDto> rows = getYearlyDashboard(year, "IN");
+        YearMonth currentMonth = YearMonth.now();
+        return rows.stream().filter(row -> {
+            LocalDate startDate = row.getStartDate();
+            if (startDate == null) {
+                return false;
+            }
+            YearMonth startMonth = YearMonth.from(startDate);
+            if (startMonth.isAfter(currentMonth)) {
+                return false;
+            }
+            LocalDate endDate = row.getEndDate();
+            if (endDate == null) {
+                return true;
+            }
+            YearMonth endMonth = YearMonth.from(endDate);
+            return !endMonth.isBefore(currentMonth);
+        })
                 .collect(Collectors.toList());
     }
-
-    public List<EmployeeMonthlyTimesheetDto> getInactiveEmployeesMonthlySummary(
-            LocalDate monthStart,
-            LocalDate monthEnd) throws Exception {
-
-        List<EmployeeMonthlyTimesheetDto> summaries = getAllEmployeesMonthlySummary(monthStart, monthEnd);
-        YearMonth selectedMonth = YearMonth.from(monthStart);
-
-        return summaries.stream().filter(row -> {
-                    LocalDate startDate = row.getJoiningDate();
-                    LocalDate endDate = row.getEndDate();
-
-                    if (startDate == null || endDate == null) {
-                        return false;
-                    }
-                    YearMonth startMonth = YearMonth.from(startDate);
-                    YearMonth endMonth = YearMonth.from(endDate);
-
-                    if (startMonth.isAfter(selectedMonth)) {
-                        return false;
-                    }
-                    return endMonth.isBefore(selectedMonth);})
+    public List<EmployeeYearlyTimesheetDto>
+    getInactiveIndianYearlyDashboard(int year) {
+        List<EmployeeYearlyTimesheetDto> rows = getYearlyDashboard(year, "IN");
+        YearMonth currentMonth = YearMonth.now();
+        return rows.stream().filter(row -> {
+            LocalDate startDate = row.getStartDate();
+            LocalDate endDate = row.getEndDate();
+            if (startDate == null || endDate == null) {
+                return false;
+            }
+            YearMonth startMonth = YearMonth.from(startDate);
+            if (startMonth.isAfter(currentMonth)) {
+                return false;
+            }
+            YearMonth endMonth = YearMonth.from(endDate);
+            return endMonth.isBefore(currentMonth);
+                })
                 .collect(Collectors.toList());
     }
-
 }
 
