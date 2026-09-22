@@ -407,4 +407,32 @@ public class TimesheetController {
                     .body(ApiResponse.error("Failed to recalculate leave summaries", "500", e.getMessage()));
         }
     }
+
+    @GetMapping("/yearly-dashboard/active")
+    public ResponseEntity<ApiResponse<List<EmployeeYearlyTimesheetDto>>> getActiveYearlyDashboard(
+            @RequestParam(required = false) Integer year
+    ) {
+        int dashboardYear = year == null ? LocalDate.now().getYear() : year;
+
+        List<EmployeeYearlyTimesheetDto> rows =
+                timesheetService.getActiveYearlyDashboard(dashboardYear);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("Active yearly timesheet dashboard fetched", rows)
+        );
+    }
+
+    @GetMapping("/yearly-dashboard/inactive")
+    public ResponseEntity<ApiResponse<List<EmployeeYearlyTimesheetDto>>> getInactiveYearlyDashboard(
+            @RequestParam(required = false) Integer year
+    ) {
+        int dashboardYear = year == null ? LocalDate.now().getYear() : year;
+
+        List<EmployeeYearlyTimesheetDto> rows =
+                timesheetService.getInactiveYearlyDashboard(dashboardYear);
+
+        return ResponseEntity.ok(
+                ApiResponse.success("Inactive yearly timesheet dashboard fetched", rows)
+        );
+    }
 }

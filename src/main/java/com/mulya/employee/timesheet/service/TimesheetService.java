@@ -1718,5 +1718,65 @@ public class TimesheetService {
         employeeLeaveSummaryRepository.save(summary);
     }
 
+    public List<EmployeeYearlyTimesheetDto> getActiveYearlyDashboard(int year) {
+
+        List<EmployeeYearlyTimesheetDto> allRows = getYearlyDashboard(year);
+
+        YearMonth currentMonth = YearMonth.now();
+
+        return allRows.stream().filter(row -> {
+                    LocalDate startDate = row.getStartDate();
+                    LocalDate endDate = row.getEndDate();
+
+                    if (startDate == null) {
+                        return false;
+                    }
+
+                    YearMonth startMonth = YearMonth.from(startDate);
+
+                    if (startMonth.isAfter(currentMonth)) {
+                        return false;
+                    }
+
+                    if (endDate == null) {
+                        return true;
+                    }
+
+                    YearMonth endMonth = YearMonth.from(endDate);
+                    return !endMonth.isBefore(currentMonth);
+                })
+                .collect(Collectors.toList());
+    }
+
+    public List<EmployeeYearlyTimesheetDto> getInactiveYearlyDashboard(int year) {
+
+        List<EmployeeYearlyTimesheetDto> allRows = getYearlyDashboard(year);
+        YearMonth currentMonth = YearMonth.now();
+
+        return allRows.stream().filter(row -> {
+
+                    LocalDate startDate = row.getStartDate();
+                    LocalDate endDate = row.getEndDate();
+
+                    if (startDate == null) {
+                        return false;
+                    }
+
+                    YearMonth startMonth = YearMonth.from(startDate);
+                    if (startMonth.isAfter(currentMonth)) {
+                        return false;
+                    }
+
+                    if (endDate == null) {
+                        return false;
+                    }
+
+                    YearMonth endMonth = YearMonth.from(endDate);
+
+                    return endMonth.isBefore(currentMonth);
+                })
+                .collect(Collectors.toList());
+    }
+
 }
 
