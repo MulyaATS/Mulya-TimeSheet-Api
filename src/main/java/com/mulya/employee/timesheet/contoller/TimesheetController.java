@@ -424,31 +424,48 @@ public class TimesheetController {
         }
     }
 
-    @GetMapping("/yearly-dashboard/active")
-    public ResponseEntity<ApiResponse<List<EmployeeYearlyTimesheetDto>>> getActiveYearlyDashboard(
-            @RequestParam(required = false) Integer year
-    ) {
-        int dashboardYear = year == null ? LocalDate.now().getYear() : year;
+    @GetMapping("/us-yearly-dashboard/active")
+    public ResponseEntity<ApiResponse<List<EmployeeYearlyTimesheetDto>>>
+    getActiveUSYearlyDashboard(
+            @RequestParam(required = false) Integer year) {
+
+        int dashboardYear =
+                year == null
+                        ? LocalDate.now().getYear()
+                        : year;
 
         List<EmployeeYearlyTimesheetDto> rows =
-                timesheetService.getActiveYearlyDashboard(dashboardYear);
+                timesheetService.getActiveUSYearlyDashboard(
+                        dashboardYear
+                );
 
         return ResponseEntity.ok(
-                ApiResponse.success("Active yearly timesheet dashboard fetched", rows)
+                ApiResponse.success(
+                        "Active US yearly timesheet dashboard fetched",
+                        rows
+                )
         );
     }
+    @GetMapping("/us-yearly-dashboard/inactive")
+    public ResponseEntity<ApiResponse<List<EmployeeYearlyTimesheetDto>>>
+    getInactiveUSYearlyDashboard(
+            @RequestParam(required = false) Integer year) {
 
-    @GetMapping("/yearly-dashboard/inactive")
-    public ResponseEntity<ApiResponse<List<EmployeeYearlyTimesheetDto>>> getInactiveYearlyDashboard(
-            @RequestParam(required = false) Integer year
-    ) {
-        int dashboardYear = year == null ? LocalDate.now().getYear() : year;
+        int dashboardYear =
+                year == null
+                        ? LocalDate.now().getYear()
+                        : year;
 
         List<EmployeeYearlyTimesheetDto> rows =
-                timesheetService.getInactiveYearlyDashboard(dashboardYear);
+                timesheetService.getInactiveUSYearlyDashboard(
+                        dashboardYear
+                );
 
         return ResponseEntity.ok(
-                ApiResponse.success("Inactive yearly timesheet dashboard fetched", rows)
+                ApiResponse.success(
+                        "Inactive US yearly timesheet dashboard fetched",
+                        rows
+                )
         );
     }
 }

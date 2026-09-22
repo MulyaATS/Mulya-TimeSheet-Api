@@ -1883,6 +1883,69 @@ public class TimesheetService {
                 })
                 .collect(Collectors.toList());
     }
+    public List<EmployeeYearlyTimesheetDto> getActiveUSYearlyDashboard(int year) {
+
+        List<EmployeeYearlyTimesheetDto> rows =
+                getYearlyDashboard(year, "US");
+
+        YearMonth currentMonth = YearMonth.now();
+
+        return rows.stream()
+                .filter(row -> {
+
+                    LocalDate startDate = row.getStartDate();
+                    LocalDate endDate = row.getEndDate();
+
+                    if (startDate == null) {
+                        return false;
+                    }
+
+                    YearMonth startMonth = YearMonth.from(startDate);
+
+                    if (startMonth.isAfter(currentMonth)) {
+                        return false;
+                    }
+
+                    if (endDate == null) {
+                        return true;
+                    }
+
+                    YearMonth endMonth = YearMonth.from(endDate);
+
+                    return !endMonth.isBefore(currentMonth);
+                })
+                .collect(Collectors.toList());
+    }
+
+    public List<EmployeeYearlyTimesheetDto> getInactiveUSYearlyDashboard(int year) {
+
+        List<EmployeeYearlyTimesheetDto> rows =
+                getYearlyDashboard(year, "US");
+
+        YearMonth currentMonth = YearMonth.now();
+
+        return rows.stream()
+                .filter(row -> {
+
+                    LocalDate startDate = row.getStartDate();
+                    LocalDate endDate = row.getEndDate();
+
+                    if (startDate == null || endDate == null) {
+                        return false;
+                    }
+
+                    YearMonth startMonth = YearMonth.from(startDate);
+
+                    if (startMonth.isAfter(currentMonth)) {
+                        return false;
+                    }
+
+                    YearMonth endMonth = YearMonth.from(endDate);
+
+                    return endMonth.isBefore(currentMonth);
+                })
+                .collect(Collectors.toList());
+    }
 
 }
 
