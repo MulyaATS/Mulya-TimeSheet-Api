@@ -1964,8 +1964,9 @@ public class TimesheetService {
                     if (startDate == null) {
                         return false;
                     }
-                    YearMonth startMonth = YearMonth.from(startDate);
 
+                    YearMonth startMonth =
+                            YearMonth.from(startDate);
                     if (startMonth.isAfter(selectedMonth)) {
                         return false;
                     }
@@ -1973,8 +1974,8 @@ public class TimesheetService {
                     if (endDate == null) {
                         return true;
                     }
-                    YearMonth endMonth = YearMonth.from(endDate);
 
+                    YearMonth endMonth = YearMonth.from(endDate);
                     return !endMonth.isBefore(selectedMonth);})
                 .collect(Collectors.toList());
     }
@@ -1987,21 +1988,18 @@ public class TimesheetService {
         YearMonth selectedMonth = YearMonth.from(monthStart);
 
         return summaries.stream().filter(row -> {
-
                     LocalDate startDate = row.getJoiningDate();
                     LocalDate endDate = row.getEndDate();
 
                     if (startDate == null || endDate == null) {
                         return false;
                     }
-
                     YearMonth startMonth = YearMonth.from(startDate);
                     YearMonth endMonth = YearMonth.from(endDate);
 
                     if (startMonth.isAfter(selectedMonth)) {
                         return false;
                     }
-
                     return endMonth.isBefore(selectedMonth);})
                 .collect(Collectors.toList());
     }
