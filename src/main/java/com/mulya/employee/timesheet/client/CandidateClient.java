@@ -2,6 +2,7 @@ package com.mulya.employee.timesheet.client;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.mulya.employee.timesheet.dto.*;
 import com.mulya.employee.timesheet.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,8 @@ import org.springframework.web.client.HttpClientErrorException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import com.mulya.employee.timesheet.dto.PlacementDetailsUSDto;
+
 
 @Service
 public class CandidateClient {
@@ -169,6 +172,48 @@ public class CandidateClient {
         } catch (Exception e) {
             System.out.println("Error fetching placements from candidate service: " + e.getMessage());
             throw new RuntimeException("Failed to fetch placements: " + e.getMessage());
+        }
+    }
+    public List<PlacementDetailsUSDto> getAllUsPlacements() {
+
+        String url = candidateServiceBaseUrl
+                + "/us-placement/placements-list?page=0&size=10000";
+
+        //logger.info("Fetching US placements from URL: {}", url);
+
+        try {
+            ResponseEntity<Map<String, Object>> response =
+                    restTemplate.exchange(
+                            url,
+                            HttpMethod.GET,
+                            null,
+                            new ParameterizedTypeReference<Map<String, Object>>() {}
+                    );
+
+            Map<String, Object> responseBody = response.getBody();
+
+            if (responseBody == null ||
+                    !Boolean.TRUE.equals(responseBody.get("success"))) {
+
+                throw new RuntimeException("Failed to fetch US placements");
+            }
+
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.registerModule(new JavaTimeModule());
+
+            return objectMapper.convertValue(
+                    responseBody.get("data"),
+                    new TypeReference<List<PlacementDetailsUSDto>>() {}
+            );
+
+        } catch (Exception ex) {
+
+           // logger.error("Error fetching US placements from candidate service", ex);
+
+            throw new RuntimeException(
+                    "Failed to fetch US placements: " + ex.getMessage(),
+                    ex
+            );
         }
     }
 }
