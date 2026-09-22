@@ -1235,6 +1235,7 @@ public class TimesheetService {
             // Get placement info for employee
             String employeeType = "Unknown";
             LocalDate joiningDate = null;
+            LocalDate endDate = null;
             String clientName = null;
             String clientId = null;
             try {
@@ -1244,6 +1245,7 @@ public class TimesheetService {
                         PlacementDetailsDto placement = placements.get(0);
                         employeeType = placement.getEmployeeType();
                         joiningDate = placement.getStartDate();
+                        endDate = placement.getEndDate();       // <-- CHANGE 2
                         // Skip employees who joined after the selected month
                         logger.info("Employee {} joining date {}", email, joiningDate);
                         if (joiningDate != null && joiningDate.isAfter(monthEnd)) {
@@ -1357,6 +1359,7 @@ public class TimesheetService {
             dto.setMonthStartDate(monthStart);
             dto.setMonthEndDate(monthEnd);
             dto.setJoiningDate(joiningDate);
+            dto.setEndDate(endDate);
             dto.setStatus(aggregatedStatus);
 
             dto.setWeek1Hours(empTimesheets.isEmpty() ? 0 : (calendarWeeks.size() > 0 ? (int) Math.round(weeklyWorkHours[0]) : 0));
@@ -1944,6 +1947,62 @@ public class TimesheetService {
 
                     return endMonth.isBefore(currentMonth);
                 })
+                .collect(Collectors.toList());
+    }
+
+    public List<EmployeeMonthlyTimesheetDto> getActiveEmployeesMonthlySummary(
+            LocalDate monthStart,
+            LocalDate monthEnd) throws Exception {
+
+        List<EmployeeMonthlyTimesheetDto> summaries = getAllEmployeesMonthlySummary(monthStart, monthEnd);
+        YearMonth selectedMonth = YearMonth.from(monthStart);
+
+        return summaries.stream().filter(row -> {
+                    LocalDate startDate = row.getJoiningDate();
+                    LocalDate endDate = row.getEndDate();
+
+                    if (startDate == null) {
+                        return false;
+                    }
+                    YearMonth startMonth = YearMonth.from(startDate);
+
+                    if (startMonth.isAfter(selectedMonth)) {
+                        return false;
+                    }
+
+                    if (endDate == null) {
+                        return true;
+                    }
+                    YearMonth endMonth = YearMonth.from(endDate);
+
+                    return !endMonth.isBefore(selectedMonth);})
+                .collect(Collectors.toList());
+    }
+
+    public List<EmployeeMonthlyTimesheetDto> getInactiveEmployeesMonthlySummary(
+            LocalDate monthStart,
+            LocalDate monthEnd) throws Exception {
+
+        List<EmployeeMonthlyTimesheetDto> summaries = getAllEmployeesMonthlySummary(monthStart, monthEnd);
+        YearMonth selectedMonth = YearMonth.from(monthStart);
+
+        return summaries.stream().filter(row -> {
+
+                    LocalDate startDate = row.getJoiningDate();
+                    LocalDate endDate = row.getEndDate();
+
+                    if (startDate == null || endDate == null) {
+                        return false;
+                    }
+
+                    YearMonth startMonth = YearMonth.from(startDate);
+                    YearMonth endMonth = YearMonth.from(endDate);
+
+                    if (startMonth.isAfter(selectedMonth)) {
+                        return false;
+                    }
+
+                    return endMonth.isBefore(selectedMonth);})
                 .collect(Collectors.toList());
     }
 

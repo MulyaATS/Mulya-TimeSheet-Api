@@ -468,4 +468,46 @@ public class TimesheetController {
                 )
         );
     }
+
+    @GetMapping("in-yearly-dashboard/active")
+    public ResponseEntity<ApiResponse<List<EmployeeMonthlyTimesheetDto>>>
+    getActiveEmployeesMonthlySummary(
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate monthStart,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate monthEnd
+    ) throws Exception {
+
+        LocalDate normalizedStart = monthStart.withDayOfMonth(1);
+
+        LocalDate normalizedEnd = monthEnd == null
+                        ? normalizedStart.withDayOfMonth(normalizedStart.lengthOfMonth())
+                        : monthEnd.withDayOfMonth(monthEnd.lengthOfMonth());
+
+        List<EmployeeMonthlyTimesheetDto> summaries = timesheetService.getActiveEmployeesMonthlySummary(normalizedStart, normalizedEnd);
+
+        return ResponseEntity.ok(ApiResponse.success("Active Indian monthly timesheet summaries fetched", summaries));
+    }
+
+    @GetMapping("/in-yearly-dashboard/inactive")
+    public ResponseEntity<ApiResponse<List<EmployeeMonthlyTimesheetDto>>>
+    getInactiveEmployeesMonthlySummary(
+            @RequestParam
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate monthStart,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate monthEnd
+    ) throws Exception {
+
+        LocalDate normalizedStart = monthStart.withDayOfMonth(1);
+        LocalDate normalizedEnd = monthEnd == null
+                        ? normalizedStart.withDayOfMonth(normalizedStart.lengthOfMonth())
+                        : monthEnd.withDayOfMonth(monthEnd.lengthOfMonth());
+
+        List<EmployeeMonthlyTimesheetDto> summaries = timesheetService.getInactiveEmployeesMonthlySummary(normalizedStart, normalizedEnd);
+        return ResponseEntity.ok(ApiResponse.success("Inactive Indian monthly timesheet summaries fetched", summaries));
+    }
 }

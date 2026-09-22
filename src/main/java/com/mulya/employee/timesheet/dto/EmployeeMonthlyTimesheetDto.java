@@ -27,6 +27,7 @@ public class EmployeeMonthlyTimesheetDto {
     private int weekendDays;              // total weekends in the month
     private double lastWorkedDays;        // actual worked days from timesheets (totalWorkingDays - weekendDays)
     private int publicHolidays;
+    private LocalDate endDate;
 
     public int getPublicHolidays() {
         return publicHolidays;
@@ -192,4 +193,8 @@ public class EmployeeMonthlyTimesheetDto {
     public void setJoiningDate(LocalDate joiningDate) {
         this.joiningDate = joiningDate;
     }
+
+    public LocalDate getEndDate() { return endDate; }
+
+    public void setEndDate(LocalDate endDate) { this.endDate = endDate;}
 }
