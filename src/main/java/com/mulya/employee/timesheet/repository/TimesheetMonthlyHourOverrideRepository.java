@@ -9,7 +9,7 @@ import java.util.Optional;
 
 public interface TimesheetMonthlyHourOverrideRepository extends JpaRepository<TimesheetMonthlyHourOverride, Long> {
 
-    List<TimesheetMonthlyHourOverride> findByUserIdInAndYear(Collection<String> userIds, Integer year);
+    List<TimesheetMonthlyHourOverride> findByCandidateIdInAndYear(Collection<String> candidateIds, Integer year);
 
-    Optional<TimesheetMonthlyHourOverride> findByUserIdAndYearAndMonthNumber(String userId, Integer year, Integer monthNumber);
+    Optional<TimesheetMonthlyHourOverride> findByCandidateIdAndYearAndMonthNumber(String candidateId, Integer year, Integer monthNumber);
 }

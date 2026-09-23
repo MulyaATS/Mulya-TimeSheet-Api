@@ -7,7 +7,9 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "timesheet_monthly_hour_overrides",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "year", "month_number"})
+        uniqueConstraints = @UniqueConstraint(
+                columnNames = {"candidate_id", "year", "month_number"}
+        )
 )
 public class TimesheetMonthlyHourOverride {
 
@@ -17,6 +19,9 @@ public class TimesheetMonthlyHourOverride {
 
     @Column(name = "user_id", nullable = false)
     private String userId;
+
+    @Column(name = "candidate_id")
+    private String candidateId;
 
     @Column(nullable = false)
     private Integer year;
@@ -83,4 +88,8 @@ public class TimesheetMonthlyHourOverride {
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
+
+    public String getCandidateId() {return candidateId;}
+
+    public void setCandidateId(String candidateId) {this.candidateId = candidateId;}
 }
