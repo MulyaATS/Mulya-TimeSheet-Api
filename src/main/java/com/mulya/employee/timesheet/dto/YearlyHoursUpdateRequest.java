@@ -3,6 +3,7 @@ package com.mulya.employee.timesheet.dto;
 import java.util.List;
 
 public class YearlyHoursUpdateRequest {
+    private String candidateId;
     private String employeeId;
     private Integer year;
     private List<Integer> monthlyHours;
@@ -40,4 +41,6 @@ public class YearlyHoursUpdateRequest {
     public void setEntity(String entity) {
         this.entity = entity;
     }
+    public String getCandidateId() {return candidateId;}
+    public void setCandidateId(String candidateId) {this.candidateId = candidateId;}
 }
