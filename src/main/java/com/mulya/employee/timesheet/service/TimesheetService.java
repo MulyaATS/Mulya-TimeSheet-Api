@@ -1256,12 +1256,18 @@ public class TimesheetService {
                         PlacementDetailsDto placement = placements.get(0);
                         employeeType = placement.getEmployeeType();
                         joiningDate = placement.getStartDate();
-                        endDate = placement.getEndDate();       // <-- CHANGE 2
-                        // Skip employees who joined after the selected month
+                        endDate = placement.getEndDate();
                         logger.info("Employee {} joining date {}", email, joiningDate);
                         if (joiningDate != null && joiningDate.isAfter(monthEnd)) {
                             logger.info("Skipping user {} because joining date {} is after selected month {}",
                                     userId, joiningDate, monthEnd);
+                            continue;
+                        }
+                        logger.info("Employee {} end date {}", email, endDate);
+
+                        if (endDate != null && endDate.isBefore(monthStart)) {
+                            logger.info("Skipping user {} because end date {} is before selected month {}",
+                                    userId, endDate, monthStart);
                             continue;
                         }
                         clientName = placement.getClientName();
