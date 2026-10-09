@@ -3,9 +3,14 @@ package com.mulya.employee.timesheet.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class ClientSimpleDto {
+
     @JsonProperty("id")
-    private String clientId;         // Client ID
-    private String clientName; // Client Name
+    private String clientId;
+
+    private String clientName;
+
+    // Populated only if the remote response contains netPay.
+    private Integer netPay;
 
     public String getClientId() {
         return clientId;
@@ -23,5 +28,11 @@ public class ClientSimpleDto {
         this.clientName = clientName;
     }
 
-    // Getters and setters
+    public Integer getNetPay() {
+        return netPay;
+    }
+
+    public void setNetPay(Integer netPay) {
+        this.netPay = netPay;
+    }
 }

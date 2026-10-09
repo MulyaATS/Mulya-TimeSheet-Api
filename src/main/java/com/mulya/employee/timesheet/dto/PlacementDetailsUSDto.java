@@ -3,8 +3,8 @@ package com.mulya.employee.timesheet.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PlacementDetailsUSDto {
@@ -27,6 +27,9 @@ public class PlacementDetailsUSDto {
     private String candidateEmail;
 
     private String userId;
+
+    // Add this if the placement API returns billRate.
+    private String billRate;
 
     public LocalDate getStartDate() {
         return startDate;
@@ -116,5 +119,11 @@ public class PlacementDetailsUSDto {
         this.userId = userId;
     }
 
+    public String getBillRate() {
+        return billRate;
+    }
 
+    public void setBillRate(String billRate) {
+        this.billRate = billRate;
+    }
 }
