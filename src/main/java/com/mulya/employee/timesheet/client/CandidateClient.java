@@ -174,12 +174,11 @@ public class CandidateClient {
             throw new RuntimeException("Failed to fetch placements: " + e.getMessage());
         }
     }
+
     public List<PlacementDetailsUSDto> getAllUsPlacements() {
 
         String url = candidateServiceBaseUrl
                 + "/us-placement/placements-list?page=0&size=10000";
-
-        //logger.info("Fetching US placements from URL: {}", url);
 
         try {
             ResponseEntity<Map<String, Object>> response =
@@ -190,30 +189,29 @@ public class CandidateClient {
                             new ParameterizedTypeReference<Map<String, Object>>() {}
                     );
 
-            Map<String, Object> responseBody = response.getBody();
+            Map<String, Object> body = response.getBody();
 
-            if (responseBody == null ||
-                    !Boolean.TRUE.equals(responseBody.get("success"))) {
-
-                throw new RuntimeException("Failed to fetch US placements");
+            if (body == null
+                    || !Boolean.TRUE.equals(body.get("success"))) {
+                throw new RuntimeException(
+                        "Candidate service returned an unsuccessful response");
             }
 
-            ObjectMapper objectMapper = new ObjectMapper();
-            objectMapper.registerModule(new JavaTimeModule());
+            Object data = body.get("data");
 
-            return objectMapper.convertValue(
-                    responseBody.get("data"),
+            if (data == null) {
+                return List.of();
+            }
+
+            return mapper.convertValue(
+                    data,
                     new TypeReference<List<PlacementDetailsUSDto>>() {}
             );
 
         } catch (Exception ex) {
-
-           // logger.error("Error fetching US placements from candidate service", ex);
-
             throw new RuntimeException(
                     "Failed to fetch US placements: " + ex.getMessage(),
-                    ex
-            );
+                    ex);
         }
     }
 }
