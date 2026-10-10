@@ -23,6 +23,9 @@ public class EmployeeLeaveSummary {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "tenant_id")
+    private String tenantId;
+
     public String getUserId() {
         return userId;
     }
@@ -69,5 +72,13 @@ public class EmployeeLeaveSummary {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 }

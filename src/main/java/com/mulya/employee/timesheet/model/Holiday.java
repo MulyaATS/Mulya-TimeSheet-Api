@@ -28,6 +28,9 @@ public class Holiday {
     @CreationTimestamp
     private LocalDateTime createdAt;
 
+    @Column(name = "tenant_id")
+    private String tenantId;
+
     public LocalDate getHolidayDate() {
         return holidayDate;
     }
@@ -73,6 +76,14 @@ public class Holiday {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 }
 

@@ -77,6 +77,7 @@ public class LeaveService {
             summary.setTakenLeaves(0);
             summary.setUpdatedBy(updatedBy);
             summary.setUpdatedAt(LocalDateTime.now());
+            summary.setTenantId(com.mulya.employee.timesheet.tenant.TenantContext.getTenantId());
             savedSummary = leaveSummaryRepository.save(summary);
         }
 
@@ -193,7 +194,8 @@ public class LeaveService {
 
     private void removeLeaveFromTimesheet(String userId, LocalDate leaveDate) throws Exception {
         LocalDate weekStart = leaveDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        Timesheet ts = timesheetRepository.findByUserIdAndWeekStartDate(userId, weekStart)
+        Timesheet ts = timesheetRepository.findByUserIdAndWeekStartDateAndTenantId(
+                        userId, weekStart, com.mulya.employee.timesheet.tenant.TenantContext.getTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("Timesheet not found"));
 
         List<TimesheetEntry> nonWorkingEntries = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<>() {});
@@ -218,7 +220,8 @@ public class LeaveService {
 
     private void addLeaveToTimesheet(String userId, LocalDate leaveDate, int daysTaken) throws Exception {
         LocalDate weekStart = leaveDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        Timesheet ts = timesheetRepository.findByUserIdAndWeekStartDate(userId, weekStart)
+        Timesheet ts = timesheetRepository.findByUserIdAndWeekStartDateAndTenantId(
+                        userId, weekStart, com.mulya.employee.timesheet.tenant.TenantContext.getTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("Timesheet not found"));
 
         List<TimesheetEntry> nonWorkingEntries = mapper.readValue(ts.getNonWorkingHours(), new TypeReference<>() {});

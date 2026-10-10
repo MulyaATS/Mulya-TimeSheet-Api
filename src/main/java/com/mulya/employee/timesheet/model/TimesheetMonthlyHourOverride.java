@@ -30,10 +30,16 @@ public class TimesheetMonthlyHourOverride {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "tenant_id")
+    private String tenantId;
+
     @PrePersist
     @PreUpdate
     public void touchUpdatedAt() {
         updatedAt = LocalDateTime.now();
+        if (tenantId == null || tenantId.isBlank()) {
+            tenantId = com.mulya.employee.timesheet.tenant.TenantContext.getTenantId();
+        }
     }
 
     public Long getId() {
@@ -82,5 +88,13 @@ public class TimesheetMonthlyHourOverride {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 }

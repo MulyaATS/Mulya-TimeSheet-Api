@@ -10,6 +10,7 @@ import com.mulya.employee.timesheet.exception.ResourceNotFoundException;
 import com.mulya.employee.timesheet.exception.ValidationException;
 import com.mulya.employee.timesheet.model.*;
 import com.mulya.employee.timesheet.repository.*;
+import com.mulya.employee.timesheet.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
@@ -155,7 +156,7 @@ public class TimesheetService {
                             && !e.getDate().isAfter(partialEnd))
                     .collect(Collectors.toList());
 
-            Timesheet ts = timesheetRepository.findByUserIdAndWeekStartDate(userId, partialStart)
+            Timesheet ts = timesheetRepository.findByUserIdAndWeekStartDateAndTenantId(userId, partialStart, TenantContext.getTenantId())
                     .orElseGet(() -> {
                         Timesheet t = new Timesheet();
                         t.setUserId(userId);
@@ -292,6 +293,7 @@ public class TimesheetService {
                 leaveTransaction.setUserId(userId);
                 leaveTransaction.setLeaveDate(leaveEntry.getDate());
                 leaveTransaction.setDaysTaken((int) Math.ceil(leaveEntry.getHours() / 8.0));
+                leaveTransaction.setTenantId(TenantContext.getTenantId());
                 employeeLeaveTransactionRepository.save(leaveTransaction);
             }
 
@@ -343,7 +345,7 @@ public class TimesheetService {
 
     public String generateNextTimesheetId() {
         // Query the max existing timesheetId from DB
-        String maxId = timesheetRepository.findMaxTimesheetId();
+        String maxId = timesheetRepository.findMaxTimesheetId(TenantContext.getTenantId());
 
         if (maxId == null) {
             // No existing ID, start from TMST00000001
@@ -388,7 +390,7 @@ public class TimesheetService {
 
     @Transactional
     public Timesheet submitWeekly(String userId, LocalDate weekStart) {
-        Timesheet ts = timesheetRepository.findByUserIdAndWeekStartDate(userId, weekStart)
+        Timesheet ts = timesheetRepository.findByUserIdAndWeekStartDateAndTenantId(userId, weekStart, TenantContext.getTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("No timesheet found for this week"));
         ts.setStatus("PENDING_APPROVAL");
 
@@ -418,7 +420,7 @@ public class TimesheetService {
         }
         LocalDate monthEndDate = monthStartDate.withDayOfMonth(monthStartDate.lengthOfMonth());
 
-        List<Timesheet> timesheets = timesheetRepository.findTimesheetsOverlappingMonth(userId, monthStartDate, monthEndDate);
+        List<Timesheet> timesheets = timesheetRepository.findTimesheetsOverlappingMonth(userId, monthStartDate, monthEndDate, TenantContext.getTenantId());
 
         if (timesheets.isEmpty()) {
             throw new IllegalArgumentException("No timesheets found overlapping the month " + monthStartDate);
@@ -449,7 +451,7 @@ public class TimesheetService {
 
     @Transactional
     public Timesheet approveTimesheet(String id, String managerUserId) {
-        Timesheet ts = timesheetRepository.findByTimesheetId(id)
+        Timesheet ts = timesheetRepository.findByTimesheetIdAndTenantId(id, TenantContext.getTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("Timesheet not found"));
 
         ts.setStatus("APPROVED");
@@ -480,7 +482,7 @@ public class TimesheetService {
 
     @Transactional
     public Timesheet rejectTimesheet(String timesheetId, String managerUserId, String reason) {
-        Timesheet ts = timesheetRepository.findByTimesheetId(timesheetId)
+        Timesheet ts = timesheetRepository.findByTimesheetIdAndTenantId(timesheetId, TenantContext.getTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("Timesheet not found"));
 
         ts.setStatus("REJECTED");
@@ -508,7 +510,7 @@ public class TimesheetService {
 
     @Transactional
     public List<Timesheet> approveMonthlyTimesheets(String userId, LocalDate monthStart, LocalDate monthEnd, String managerUserId) {
-        List<Timesheet> timesheets = timesheetRepository.findTimesheetsOverlappingMonth(userId, monthStart, monthEnd);
+        List<Timesheet> timesheets = timesheetRepository.findTimesheetsOverlappingMonth(userId, monthStart, monthEnd, TenantContext.getTenantId());
 
         if (timesheets.isEmpty()) {
             throw new IllegalArgumentException("No timesheets found overlapping the month");
@@ -547,7 +549,7 @@ public class TimesheetService {
 
     @Transactional
     public List<Timesheet> rejectMonthlyTimesheets(String userId, LocalDate monthStart, LocalDate monthEnd, String managerUserId, String reason) {
-        List<Timesheet> timesheets = timesheetRepository.findTimesheetsOverlappingMonth(userId, monthStart, monthEnd);
+        List<Timesheet> timesheets = timesheetRepository.findTimesheetsOverlappingMonth(userId, monthStart, monthEnd, TenantContext.getTenantId());
 
         if (timesheets.isEmpty()) {
             throw new IllegalArgumentException("No timesheets found overlapping the month");
@@ -586,7 +588,7 @@ public class TimesheetService {
 
 
     public Page<TimesheetApprovalDto> getTimesheetsByStatus(String status, String managerUserId, Pageable pageable) {
-        Page<Timesheet> timesheetPage = timesheetRepository.findByStatus(status, pageable);
+        Page<Timesheet> timesheetPage = timesheetRepository.findByStatusAndTenantId(status, TenantContext.getTenantId(), pageable);
         return timesheetPage.map(ts -> toApprovalDto(ts, managerUserId));
     }
 
@@ -658,7 +660,7 @@ public class TimesheetService {
     }
 
     public MonthlyTimesheetResponse getTimesheetsByUserIdAndMonth(String userId, LocalDate monthStart, LocalDate monthEnd) {
-        List<Timesheet> timesheets = timesheetRepository.findTimesheetsOverlappingMonth(userId, monthStart, monthEnd);
+        List<Timesheet> timesheets = timesheetRepository.findTimesheetsOverlappingMonth(userId, monthStart, monthEnd, TenantContext.getTenantId());
 
         final double[] totalMonthlyWorkingHours = {0.0};
         List<TimesheetResponse> dtos = timesheets.stream()
@@ -709,7 +711,7 @@ public class TimesheetService {
 
 
     public List<TimesheetResponse> getAllTimesheetsByUserId(String userId) {
-        List<Timesheet> timesheets = timesheetRepository.findByUserId(userId);
+        List<Timesheet> timesheets = timesheetRepository.findByUserIdAndTenantId(userId, TenantContext.getTenantId());
         return timesheets.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -717,7 +719,7 @@ public class TimesheetService {
 
 
     public List<TimesheetResponse> getAllTimesheets() {
-        return timesheetRepository.findAll()
+        return timesheetRepository.findByTenantId(TenantContext.getTenantId())
                 .stream()
                 .map(this::mapToResponse) // map entity -> DTO
                 .collect(Collectors.toList());
@@ -1009,7 +1011,7 @@ public class TimesheetService {
 
     @Transactional
     public Timesheet updateTimesheet(String timesheetId, String userId, TimesheetRequest req) throws Exception {
-        Timesheet ts = timesheetRepository.findByTimesheetId(timesheetId)
+        Timesheet ts = timesheetRepository.findByTimesheetIdAndTenantId(timesheetId, TenantContext.getTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("Timesheet not found"));
 
         if (!ts.getUserId().equals(userId)) {
@@ -1038,7 +1040,7 @@ public class TimesheetService {
     public Timesheet updateTimesheetEntries(String timesheetId, String userId,
                                             List<TimesheetEntry> updatedWorkingEntries, List<TimesheetEntry> updatedNonWorkingEntries) throws Exception {
 
-        Timesheet ts = timesheetRepository.findByTimesheetId(timesheetId)
+        Timesheet ts = timesheetRepository.findByTimesheetIdAndTenantId(timesheetId, TenantContext.getTenantId())
                 .orElseThrow(() -> new IllegalArgumentException("Timesheet not found"));
 
         if (!ts.getUserId().equals(userId)) {
@@ -1122,7 +1124,7 @@ public class TimesheetService {
     @Transactional
     public Timesheet uploadAttachments(String timesheetId, List<MultipartFile> files,
                                        LocalDate attachmentStartDate, LocalDate attachmentEndDate) throws IOException {
-        Timesheet ts = timesheetRepository.findByTimesheetId(timesheetId)
+        Timesheet ts = timesheetRepository.findByTimesheetIdAndTenantId(timesheetId, TenantContext.getTenantId())
                 .orElseThrow(() -> new ResourceNotFoundException("Timesheet not found with ID: " + timesheetId, ResourceNotFoundException.ResourceType.TIMESHEET));
 
         // Validate attachment dates within timesheet week
@@ -1193,7 +1195,8 @@ public class TimesheetService {
         Set<String> userIds = new HashSet<>(emailToUserId.values());
 
         // Step 2: Fetch timesheets for the month for placement users only
-        List<Timesheet> timesheets = timesheetRepository.findByWeekStartDateBetween(monthStart, monthEnd)
+        List<Timesheet> timesheets = timesheetRepository.findByWeekStartDateBetweenAndTenantId(
+                        monthStart, monthEnd, TenantContext.getTenantId())
                 .stream()
                 .filter(t -> userIds.contains(t.getUserId()))
                 .collect(Collectors.toList());
@@ -1268,7 +1271,8 @@ public class TimesheetService {
 
             // Fetch holidays filtered by client ID and date range
             List<Holiday> holidaysInMonth = clientId != null
-                    ? holidayRepository.findByClientIdAndHolidayDateBetween(clientId, monthStart, monthEnd)
+                    ? holidayRepository.findByClientIdAndHolidayDateBetweenAndTenantId(
+                            clientId, monthStart, monthEnd, TenantContext.getTenantId())
                     : Collections.emptyList();
             int publicHolidaysCount = holidaysInMonth.size();
 
@@ -1462,7 +1466,8 @@ public class TimesheetService {
         Set<String> timesheetUserIds = new HashSet<>(emailToUserId.values());
         List<Timesheet> yearTimesheets = timesheetUserIds.isEmpty()
                 ? Collections.emptyList()
-                : timesheetRepository.findByWeekStartDateBetween(yearStart.minusDays(7), yearEnd)
+                : timesheetRepository.findByWeekStartDateBetweenAndTenantId(
+                        yearStart.minusDays(7), yearEnd, TenantContext.getTenantId())
                 .stream()
                 .filter(t -> timesheetUserIds.contains(t.getUserId()))
                 .collect(Collectors.toList());

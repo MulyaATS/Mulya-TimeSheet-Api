@@ -69,10 +69,16 @@ public class Timesheet {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "tenant_id")
+    private String tenantId;
+
     @PrePersist
     public void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = createdAt;
+        if (tenantId == null || tenantId.isBlank()) {
+            tenantId = com.mulya.employee.timesheet.tenant.TenantContext.getTenantId();
+        }
     }
 
     @PreUpdate
@@ -149,5 +155,13 @@ public class Timesheet {
 
     public void setHolidays(String holidays) {
         this.holidays = holidays;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 }

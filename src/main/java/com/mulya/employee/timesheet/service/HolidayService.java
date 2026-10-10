@@ -8,6 +8,7 @@ import com.mulya.employee.timesheet.dto.HolidayRequest;
 import com.mulya.employee.timesheet.dto.PlacementDetailsDto;
 import com.mulya.employee.timesheet.model.Holiday;
 import com.mulya.employee.timesheet.repository.HolidayRepository;
+import com.mulya.employee.timesheet.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,8 +87,8 @@ public class HolidayService {
 
                     boolean alreadyExists = false;
                     try {
-                        alreadyExists = holidayRepository.findByClientIdAndHolidayDateAndHolidayName(
-                                client.getClientId(), holidayDate, holidayName).isPresent();
+                        alreadyExists = holidayRepository.findByClientIdAndHolidayDateAndHolidayNameAndTenantId(
+                                client.getClientId(), holidayDate, holidayName, TenantContext.getTenantId()).isPresent();
                     } catch (Exception ex) {
                         logger.error("Error checking existing holiday for client {}: {}", client.getClientId(), ex.getMessage());
                         return ApiResponse.error("Database error during duplicate check", "500", ex.getMessage());
@@ -105,6 +106,7 @@ public class HolidayService {
                     holiday.setClientName(clientName);
                     holiday.setHolidayDate(holidayDate);
                     holiday.setHolidayName(holidayName);
+                    holiday.setTenantId(TenantContext.getTenantId());
 
                     Holiday saved = holidayRepository.save(holiday);
                     savedHolidays.add(saved);
@@ -131,7 +133,7 @@ public class HolidayService {
     }
 
     public String generateNextHolidayId() {
-        String maxId = holidayRepository.findMaxHolidayId();
+        String maxId = holidayRepository.findMaxHolidayId(TenantContext.getTenantId());
 
         if (maxId == null) {
             return "HLDY00000001";
@@ -145,7 +147,7 @@ public class HolidayService {
 
     public ApiResponse<List<Holiday>> getAllHolidays() {
         try {
-            List<Holiday> holidays = holidayRepository.findAll();
+            List<Holiday> holidays = holidayRepository.findByTenantId(TenantContext.getTenantId());
             logger.info("Retrieved {} holidays from repository", holidays.size());
             return ApiResponse.success("Holidays retrieved successfully", holidays);
         } catch (Exception e) {
@@ -156,7 +158,8 @@ public class HolidayService {
 
     public ApiResponse<List<Holiday>> getHolidaysByClientId(String clientId) {
         try {
-            List<Holiday> holidays = holidayRepository.findByClientId(clientId);
+            List<Holiday> holidays = holidayRepository.findByClientIdAndTenantId(
+                    clientId, TenantContext.getTenantId());
             logger.info("Retrieved {} holidays for clientId: {}", holidays.size(), clientId);
             return ApiResponse.success("Holidays retrieved successfully for clientId: " + clientId, holidays);
         } catch (Exception e) {

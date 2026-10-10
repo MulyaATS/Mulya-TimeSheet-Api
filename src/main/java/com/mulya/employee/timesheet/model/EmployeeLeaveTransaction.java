@@ -27,6 +27,9 @@ public class EmployeeLeaveTransaction {
     @Column(nullable = true)
     private LocalDateTime updatedAt;
 
+    @Column(name = "tenant_id")
+    private String tenantId;
+
     @PreUpdate
     public void preUpdate() {
         updatedAt = LocalDateTime.now();
@@ -92,5 +95,13 @@ public class EmployeeLeaveTransaction {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
     }
 }
