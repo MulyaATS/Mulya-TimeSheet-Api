@@ -14,4 +14,5 @@ public class InvoiceUpdateRequest {
     private LocalDate receivedDate;
     private BigDecimal receivedAmount;
     private String remarks;
+    private BigDecimal billRate;
 }

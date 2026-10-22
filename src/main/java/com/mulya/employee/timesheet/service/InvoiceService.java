@@ -122,9 +122,7 @@ public class InvoiceService {
              * The actual decryption logic must be added once the
              * Candidate Service's encryption implementation is known.
              */
-            BigDecimal billRate = parseBillRate(
-                    placement.getBillRate(),
-                    placementId);
+            BigDecimal billRate = BigDecimal.ZERO;
 
             BigDecimal deductionPercentage = BigDecimal.ZERO;
 
@@ -328,79 +326,50 @@ public class InvoiceService {
 
         return invoiceDate.plusDays(netPay);
     }
-
-    // Update an existing invoice
-    public InvoiceDto updateInvoice(
-            Long invoiceDatabaseId,
-            InvoiceUpdateRequest request) {
+    public InvoiceDto updateInvoice(Long invoiceDatabaseId, InvoiceUpdateRequest request) {
 
         if (request == null) {
-            throw new IllegalArgumentException(
-                    "Invoice update request cannot be null");
+            throw new IllegalArgumentException("Invoice update request cannot be null");
         }
-
         Invoice invoice = invoiceRepository.findById(invoiceDatabaseId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Invoice not found: " + invoiceDatabaseId));
-
+                .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + invoiceDatabaseId));
         if (request.getInvoiceId() != null) {
-
-            String requestedInvoiceId =
-                    request.getInvoiceId().trim();
-
-            if (requestedInvoiceId.isBlank()) {
-                throw new IllegalArgumentException(
-                        "Invoice ID cannot be blank");
+            String requestedInvoiceId = request.getInvoiceId().trim();
+            if (requestedInvoiceId.isBlank()) {throw new IllegalArgumentException("Invoice ID cannot be blank");
             }
-
-            boolean duplicate =
-                    invoiceRepository.existsByInvoiceIdIgnoreCase(
-                            requestedInvoiceId);
-
-            boolean sameId = invoice.getInvoiceId() != null
-                    && invoice.getInvoiceId().equalsIgnoreCase(
-                    requestedInvoiceId);
+            boolean duplicate = invoiceRepository.existsByInvoiceIdIgnoreCase(requestedInvoiceId);
+            boolean sameId = invoice.getInvoiceId() != null && invoice.getInvoiceId().equalsIgnoreCase(requestedInvoiceId);
 
             if (duplicate && !sameId) {
-                throw new IllegalArgumentException(
-                        "Invoice ID already exists: "
-                                + requestedInvoiceId);
+                throw new IllegalArgumentException("Invoice ID already exists: " + requestedInvoiceId);
             }
-
             invoice.setInvoiceId(requestedInvoiceId);
         }
+        if (request.getBillRate() != null || request.getDeductionPercentage() != null) {
+            BigDecimal billRate = request.getBillRate() != null ? request.getBillRate() : invoice.getBillRate();
 
-        if (request.getDeductionPercentage() != null) {
+            BigDecimal deductionPercentage = request.getDeductionPercentage() != null ? request.getDeductionPercentage() : invoice.getDeductionPercentage();
 
-            BigDecimal percentage =
-                    request.getDeductionPercentage();
+            if (billRate == null || billRate.compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Bill rate cannot be negative or null");
+            }
 
-            BigDecimal deductionValue = calculateDeductionValue(
-                    invoice.getBillRate(),
-                    percentage);
-
-            BigDecimal invoiceRate = calculateInvoiceRate(
-                    invoice.getBillRate(),
-                    deductionValue);
-
-            invoice.setDeductionPercentage(percentage);
+            if (deductionPercentage == null
+                    || deductionPercentage.compareTo(BigDecimal.ZERO) < 0
+                    || deductionPercentage.compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new IllegalArgumentException("Deduction percentage must be between 0 and 100");
+            }
+            BigDecimal deductionValue = calculateDeductionValue(billRate, deductionPercentage);
+            BigDecimal invoiceRate = calculateInvoiceRate(billRate, deductionValue);
+            invoice.setBillRate(billRate);
+            invoice.setDeductionPercentage(deductionPercentage);
             invoice.setDeductionValue(deductionValue);
             invoice.setInvoiceRate(invoiceRate);
-
-            invoice.setInvoiceAmount(
-                    calculateInvoiceAmount(
-                            invoice.getTotalHours(),
-                            invoiceRate));
+            invoice.setInvoiceAmount(calculateInvoiceAmount(invoice.getTotalHours(), invoiceRate));
         }
-
         if (request.getInvoiceDate() != null) {
-
             invoice.setInvoiceDate(request.getInvoiceDate());
-
-            invoice.setDueDate(
-                    calculateDueDate(
-                            request.getInvoiceDate(),
-                            invoice.getNetPay()));
+            invoice.setDueDate(calculateDueDate(request.getInvoiceDate(), invoice.getNetPay()));
         }
 
         if (request.getReceivedDate() != null) {
@@ -408,24 +377,16 @@ public class InvoiceService {
         }
 
         if (request.getReceivedAmount() != null) {
-
-            if (request.getReceivedAmount().compareTo(
-                    BigDecimal.ZERO) < 0) {
-
-                throw new IllegalArgumentException(
-                        "Received amount cannot be negative");
+            if (request.getReceivedAmount().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Received amount cannot be negative");
             }
-
-            invoice.setReceivedAmount(
-                    request.getReceivedAmount());
+            invoice.setReceivedAmount(request.getReceivedAmount());
         }
-
         if (request.getRemarks() != null) {
             invoice.setRemarks(request.getRemarks());
         }
 
         Invoice updatedInvoice = invoiceRepository.save(invoice);
-
         return toDto(updatedInvoice);
     }
 
