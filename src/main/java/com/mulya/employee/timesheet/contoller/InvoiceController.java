@@ -31,16 +31,7 @@ public class InvoiceController {
         this.invoiceService = invoiceService;
     }
 
-    /**
-     * Fetch invoices for a selected month and entity.
-     *
-     * Example:
-     * GET /api/invoices?month=2026-10&entity=US
-     *
-     * If month is omitted, the service uses the current month.
-     * If entity is omitted, the service processes US placements.
-     */
-    @GetMapping
+    @GetMapping("/getall")
     public ResponseEntity<List<InvoiceDto>> getInvoices(
             @RequestParam(required = false)
             @DateTimeFormat(pattern = "yyyy-MM")
@@ -55,13 +46,7 @@ public class InvoiceController {
         return ResponseEntity.ok(invoices);
     }
 
-    /**
-     * Fetch one invoice using its database ID.
-     *
-     * Example:
-     * GET /api/invoices/1
-     */
-    @GetMapping("/{id}")
+    @GetMapping("getbyid/{id}")
     public ResponseEntity<InvoiceDto> getInvoiceById(
             @PathVariable("id") Long id) {
 
@@ -71,13 +56,7 @@ public class InvoiceController {
         return ResponseEntity.ok(invoice);
     }
 
-    /**
-     * Update invoice details.
-     *
-     * Example:
-     * PUT /api/invoices/1
-     */
-    @PutMapping("/{id}")
+    @PutMapping("update/{id}")
     public ResponseEntity<InvoiceDto> updateInvoice(
             @PathVariable("id") Long id,
             @RequestBody InvoiceUpdateRequest request) {
